@@ -1,0 +1,197 @@
+[
+  {
+    "name": "Default square",
+    "config": {
+      "participants": 150,
+      "seed": 42,
+      "maxSteps": 5000,
+      "weightMean": 0.5,
+      "weightVariance": 1,
+      "observationRadius": 5,
+      "reconsiderAfter": 10,
+      "reconsiderEvery": 8,
+      "explorationProbability": 0.02,
+      "conflictFriction": 0.05,
+      "timeReference": 10,
+      "panicTimeScale": 100,
+      "residualStd": 0.2,
+      "distanceScale": 1,
+      "congestionScale": 1,
+      "panicScale": 1,
+      "geometry": {
+        "type": "square",
+        "size": 31,
+        "exitWidth": 1,
+        "obstacles": []
+      }
+    },
+    "summary": {
+      "status": "complete",
+      "participants": 150,
+      "exited": 150,
+      "remaining": 0,
+      "elapsedSteps": 933,
+      "clearanceTime": 933,
+      "meanExitTimeAmongExited": 176.38666666666666,
+      "p95ExitTimeAmongExited": 747,
+      "meanWaitingStepsAllParticipants": 152.74666666666667,
+      "switches": 194,
+      "conflicts": 242,
+      "frictionEvents": 9,
+      "exitCounts": {
+        "North": 12,
+        "East": 52,
+        "South": 46,
+        "West": 40
+      }
+    }
+  },
+  {
+    "name": "Larger population",
+    "config": {
+      "participants": 1000,
+      "seed": 42,
+      "maxSteps": 5000,
+      "weightMean": 0.5,
+      "weightVariance": 1,
+      "observationRadius": 5,
+      "reconsiderAfter": 10,
+      "reconsiderEvery": 8,
+      "explorationProbability": 0.02,
+      "conflictFriction": 0.05,
+      "timeReference": 10,
+      "panicTimeScale": 100,
+      "residualStd": 0.2,
+      "distanceScale": 1,
+      "congestionScale": 1,
+      "panicScale": 1,
+      "geometry": {
+        "type": "square",
+        "size": 61,
+        "exitWidth": 1,
+        "obstacles": []
+      }
+    },
+    "summary": {
+      "status": "step_limit",
+      "participants": 1000,
+      "exited": 970,
+      "remaining": 30,
+      "elapsedSteps": 5000,
+      "clearanceTime": null,
+      "meanExitTimeAmongExited": 2068.282474226804,
+      "p95ExitTimeAmongExited": 4697,
+      "meanWaitingStepsAllParticipants": 2084.452,
+      "switches": 32905,
+      "conflicts": 3581,
+      "frictionEvents": 158,
+      "exitCounts": {
+        "North": 387,
+        "East": 348,
+        "South": 184,
+        "West": 51
+      }
+    }
+  },
+  {
+    "name": "Square with central obstacle",
+    "config": {
+      "participants": 150,
+      "seed": 42,
+      "maxSteps": 5000,
+      "weightMean": 0.5,
+      "weightVariance": 1,
+      "observationRadius": 5,
+      "reconsiderAfter": 10,
+      "reconsiderEvery": 8,
+      "explorationProbability": 0.02,
+      "conflictFriction": 0.05,
+      "timeReference": 10,
+      "panicTimeScale": 100,
+      "residualStd": 0.2,
+      "distanceScale": 1,
+      "congestionScale": 1,
+      "panicScale": 1,
+      "geometry": {
+        "type": "square",
+        "size": 31,
+        "exitWidth": 1,
+        "obstacles": [
+          {
+            "x": 13,
+            "y": 8,
+            "width": 3,
+            "height": 15
+          }
+        ]
+      }
+    },
+    "summary": {
+      "status": "complete",
+      "participants": 150,
+      "exited": 150,
+      "remaining": 0,
+      "elapsedSteps": 1050,
+      "clearanceTime": 1050,
+      "meanExitTimeAmongExited": 108.84,
+      "p95ExitTimeAmongExited": 551,
+      "meanWaitingStepsAllParticipants": 89.48666666666666,
+      "switches": 236,
+      "conflicts": 269,
+      "frictionEvents": 16,
+      "exitCounts": {
+        "North": 32,
+        "East": 44,
+        "South": 37,
+        "West": 37
+      }
+    }
+  },
+  {
+    "name": "Larger population with extended step budget",
+    "config": {
+      "participants": 1000,
+      "seed": 42,
+      "maxSteps": 20000,
+      "weightMean": 0.5,
+      "weightVariance": 1,
+      "observationRadius": 5,
+      "reconsiderAfter": 10,
+      "reconsiderEvery": 8,
+      "explorationProbability": 0.02,
+      "conflictFriction": 0.05,
+      "timeReference": 10,
+      "panicTimeScale": 100,
+      "residualStd": 0.2,
+      "distanceScale": 1,
+      "congestionScale": 1,
+      "panicScale": 1,
+      "geometry": {
+        "type": "square",
+        "size": 61,
+        "exitWidth": 1,
+        "obstacles": []
+      }
+    },
+    "summary": {
+      "status": "complete",
+      "participants": 1000,
+      "exited": 1000,
+      "remaining": 0,
+      "elapsedSteps": 5655,
+      "clearanceTime": 5655,
+      "meanExitTimeAmongExited": 2167.804,
+      "p95ExitTimeAmongExited": 4746,
+      "meanWaitingStepsAllParticipants": 2094.912,
+      "switches": 33047,
+      "conflicts": 3589,
+      "frictionEvents": 158,
+      "exitCounts": {
+        "North": 397,
+        "East": 354,
+        "South": 190,
+        "West": 59
+      }
+    }
+  }
+]

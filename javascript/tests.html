@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Exit model tests</title>
+<link rel="stylesheet" href="style.css"></head><body>
+<header><h1>Exit model verification</h1><p id="summary">Running…</p></header>
+<pre id="results" style="margin:24px;max-height:none"></pre>
+<script src="model.js"></script><script src="test-model.js"></script>
+<script>
+setTimeout(() => {
+  const results = runModelTests(AuditoriumModel);
+  document.getElementById('summary').textContent = `${results.filter(r => r.passed).length} / ${results.length} tests passed`;
+  document.getElementById('results').textContent = results.map(r => `${r.passed ? 'PASS' : 'FAIL'} ${r.name}${r.message ? ': ' + r.message : ''}`).join('\n');
+}, 50);
+</script></body></html>

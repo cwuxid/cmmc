@@ -1,0 +1,888 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.7in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,longtable,booktabs,array}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\title{Model Parameter Reference}
+\author{Bailey Motion Engine: Python implementation}
+\date{}
+\begin{document}
+\maketitle
+\tableofcontents
+\section*{Mathematical conventions}
+The fixed behavioral weights have order $(T,P,N,S)$:
+\[
+\Sigma=\sigma^2[(1-\rho)I_4+\rho\mathbf{1}_4\mathbf{1}_4^\top],\quad
+z_i\sim\mathcal{N}_4(-\tfrac12\sigma^2\mathbf{1}_4,\Sigma),\quad
+w_{ij}=\exp(z_{ij}),\quad \mathbb{E}[w_{ij}]=1.
+\]
+Here $\sigma>0$ and $-1/3<\rho<1$. Weights are not normalized to a fixed sum. Their behavioral dot product is
+\[
+U_i^{\mathrm{beh}}(a,t)=-w_{iT}T_i(a,t)+w_{iP}P_i(a,t)-w_{iN}N_i(a,t)-w_{iS}C_i(a,t).
+\]
+The optional LED contribution is
+\[
+G_i^{\mathrm{LED}}(a,t)=\kappa_{\mathrm{LED}}\mathbf{1}\{a=a_i^{\mathrm{LED}}(t)\},\quad \kappa_{\mathrm{LED}}\geq0,
+\]
+for a valid indicated next action. This is an additive utility bonus, not an acceleration. Manager guidance uses reception signal $q=\exp(-d/\ell)$ within range and line of sight, and memory decay $\exp(-\mathrm{age}/\tau)$ until expiration. Ordinary local utility additionally contains the implemented distance and shock terms unless \texttt{behavioralOnly} is enabled. Student mode bypasses utility selection and suppresses both guidance options.
+This reference describes the Python implementation and its bundled configuration. Defaults below come from \texttt{bailey\_\allowbreak{}motion/\allowbreak{}default\_\allowbreak{}world.\allowbreak{}json}, \texttt{bailey\_\allowbreak{}motion/\allowbreak{}default\_\allowbreak{}policy\_\allowbreak{}settings.\allowbreak{}json}, and the optional guidance modules. Distances are schematic metres, times are simulated seconds, and speeds are metres per second. Geometry reproduces the supplied topology; its dimensions are approximations, not a surveyed building model. This document contains no experimental results.
+
+
+World settings belong in the world JSON. Behavioral and force settings belong in the policy-settings JSON. \texttt{student\allowbreak{}Mode}, \texttt{crowd\allowbreak{}Managers}, and \texttt{led\allowbreak{}Strips} are optional world settings. A custom trusted Python policy can implement different semantics from those described here.
+
+
+\section{Run, audience, and numerical controls}
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{seed} & 2026 & integer & Reproducibility seed. Public input accepts unsigned 32-bit values. The underlying generator maps zero to one. Repeat the full configuration, policy, time step, and random-stream mode when comparing runs. \\
+
+\texttt{population} & 300 & people & Number of occupied seats sampled from the 1,329-seat inventory. Public validation accepts 1 through 1329; direct engine construction also clamps to inventory capacity. Staff do not count toward this number. \\
+
+\texttt{dt} & 0.1 & seconds/tick & Integration and event time step. Public validation requires 0 < dt <= 0.4. Changing it changes numerical motion, collision resolution, and event timing. The 0.4 ceiling is an input guard, not evidence of calibrated numerical accuracy. \\
+
+\texttt{playback} & 10 & simulated seconds/wall second & GUI playback rate. It controls how quickly ticks are presented, without changing the simulated integration step or intended physical speeds. \\
+
+\texttt{limits.\allowbreak{}max\allowbreak{}Seconds} & 1800 & seconds & Simulation horizon. An incomplete run is stopped at the first tick reaching the cap; incomplete clearance must not be reported as a completed evacuation time. \\
+
+\texttt{limits.\allowbreak{}hard\allowbreak{}Collisions} & true & boolean & Reject overlapping body motions. Disabling it retains soft social-force interactions. \\
+
+\texttt{limits.\allowbreak{}enforce\allowbreak{}Regions} & true & boolean & Reject proposed positions outside the current permitted region. Portal eligibility and transitions remain separate rules. \\
+
+\texttt{limits.\allowbreak{}door\allowbreak{}Capacity} & true & boolean & Apply door token throughput limits. Disabling it does not remove connector lane spacing, occupancy limits, aperture fit, or landing clearance. \\
+
+\texttt{student\allowbreak{}Mode} & false; optional & boolean & Give every audience member complete layout knowledge and shortest-distance route choice. Reaction delay, bodies, movement forces, queues, and connector timing remain active. Students suppress crowd-manager guidance, manager bodies, and LED guidance. \\
+
+\end{longtable}
+
+}
+
+The GUI must successfully reset before an edited run setting becomes the engine's setting. A rejected value such as dt = 2 does not establish a two-second integration run. Compare the active run configuration, rather than only the text remaining in an input box.
+
+
+\section{Arrival memory and individual sampling}
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{arrival.\allowbreak{}default\allowbreak{}Entrance} & M2 & exterior portal ID & Reconstruct a plausible admission route in reverse, from this entrance to each seat. This initializes remembered paths; it is not a familiarity utility coefficient. \\
+
+\texttt{arrival.\allowbreak{}routes\allowbreak{}By\allowbreak{}Seat} & empty object & seat-label map & Optional explicit admission memories. Each seat entry supplies a connected \texttt{portals} list, exterior first, and may supply \texttt{row\allowbreak{}Side}. The route must reach the seat's section. \\
+
+\texttt{arrival.\allowbreak{}routes\allowbreak{}By\allowbreak{}Seat.\allowbreak{}<seat>.\allowbreak{}portals} & inferred & list of IDs & Admission-route portal sequence, used to initialize path knowledge. \\
+
+\texttt{arrival.\allowbreak{}routes\allowbreak{}By\allowbreak{}Seat.\allowbreak{}<seat>.\allowbreak{}row\allowbreak{}Side} & inferred & ROW\_LEFT / ROW\_RIGHT & Initial row-side convention from admission. \\
+
+\texttt{distributions.\allowbreak{}<trait>.\allowbreak{}type} & varies & normal / beta / lognormal & Distribution used at initialization. Traits below are sampled once per person. \\
+
+\texttt{distributions.\allowbreak{}<trait>.\allowbreak{}mean} & varies & trait units & Requested arithmetic mean, including for lognormal sampling. \\
+
+\texttt{distributions.\allowbreak{}<trait>.\allowbreak{}sd} & varies & trait units & Standard deviation, not variance. A value below 1e-10 returns the mean before clipping and consumes no sampling draw. \\
+
+\texttt{distributions.\allowbreak{}<trait>.\allowbreak{}min}, \texttt{.\allowbreak{}max} & optional & trait units & Clip the sampled value to these limits. This is clipping, not rejection sampling from a truncated distribution. \\
+
+\end{longtable}
+
+}
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Distribution} & \textbf{Default} & \textbf{Units/type} & \textbf{Actual use} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Distribution} & \textbf{Default} & \textbf{Units/type} & \textbf{Actual use} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{sanity} & beta; mean 0.75, sd 0.16 & dimensionless & Supplies the clipped \texttt{beta\allowbreak{}Distance} exponent in the extra distance term of ordinary local utility. This is separate from the time weight. \\
+
+\texttt{groupthink} & beta; mean 0.55, sd 0.20 & dimensionless & Supplies \texttt{beta\allowbreak{}Crowd}, clipped from twice the draw minus one. Used by legacy behavioral route choice, not the current local peer weight. \\
+
+\texttt{pack} & beta; mean 0.45, sd 0.22 & dimensionless & Sampled and exported, but unused by the bundled decisions and forces. \\
+
+\texttt{norms} & beta; mean 0.65, sd 0.17 & dimensionless & Scales interaction amplitude in legacy social forces. It does not determine the current behavioral norm weight, and is not used by manuscript interaction forces. \\
+
+\texttt{speed} & normal; mean 1.29, sd 0.19; min 0.5, max 2.3 & m/s & Individual desired speed; affects physical driving, speed limits, perceived travel time, and connector travel. \\
+
+\texttt{reaction} & lognormal; mean 2, sd 1.2; min 0, max 40 & seconds & Delay before the person's initial evacuation movement. Students also retain this delay. \\
+
+\texttt{radius} & normal; mean 0.2025, sd 0 & metres & Body radius, aperture fit, body exclusion, and connector spacing. Default bodies have identical radii. \\
+
+\texttt{panic} & absent; policy fallback & dimensionless & Optional per-person panic sensitivity, clipped into [0,1]. If absent, \texttt{panic\allowbreak{}Mean} and \texttt{panic\allowbreak{}SD} supply the fallback distribution. \\
+
+\texttt{comfort\allowbreak{}Distance} & absent; policy fallback & metres & Optional positive per-person override for manuscript obstacle-force decay distance. \\
+
+\end{longtable}
+
+}
+
+For a lognormal with arithmetic mean m and standard deviation s, the implementation uses latent variance log(1 + s squared / m squared) and latent mean log(m) minus half that variance. Beta sampling converts the requested moments to shape parameters, but floors its concentration and shapes; extreme requested moments need not be reproduced exactly. Changing even an unused sampled trait can change later random draws in the ordinary sequential stream.
+
+
+\section{Behavioral utility and all policy settings}
+
+Each person receives four fixed, strictly positive weights in the order time T, peers P, norms N, switching S. There is no familiarity weight. The local feature vector is (-T, P, -N, -C), with travel time normalized by \texttt{time\allowbreak{}Scale}. The behavioral dot product is -wT*T + wP*P - wN*N - wS*C. Ordinary local utility additionally includes the distance score and held panic/residual shocks; optional guidance adds utility bonuses. \texttt{behavioral\allowbreak{}Only} removes the extra distance and shock terms in local mode.
+
+
+The four-dimensional weight vector is joint lognormal: draw a normal vector with covariance sigma squared times [(1-rho) I + rho 11-transpose], and mean -sigma squared/2 in every component, then exponentiate componentwise. Thus every component has population mean one. Vectors are not divided by their sum. \texttt{weight\allowbreak{}Rho} describes latent-normal correlation, not the correlation of exponentiated weights.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning and applicability} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning and applicability} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{weight\allowbreak{}Sigma} & 1 & dimensionless & Latent-normal standard deviation. Larger values produce greater heterogeneity and heavier positive weight tails. Must be positive. \\
+
+\texttt{weight\allowbreak{}Rho} & -0.15 & dimensionless & Common latent correlation. For four weights the positive-definite range is -1/3 < rho < 1. Negative values probabilistically associate strong sensitivity to one feature with weaker sensitivities to others. \\
+
+\texttt{time\allowbreak{}Scale} & 1 & seconds & Normalize perceived local travel time, including enabled queue and row-block estimates. Larger values weaken the time penalty relative to the other utility components; physical speed is unchanged. \\
+
+\texttt{decision\allowbreak{}Interval} & 3 & seconds & Periodic decisions in current two-plan geometry. Stage transitions and newly learned closures can trigger earlier reconsideration. This is separate from force integration dt. \\
+
+\texttt{noise\allowbreak{}Interval} & 15 & seconds & Hold decision shocks in time buckets of this length. Shocks are indexed by person, option, and kind within a bucket. \\
+
+\texttt{shock\allowbreak{}SD} & 0.2 & utility units & Standard deviation of panic and residual normal shocks. Local \texttt{behavioral\allowbreak{}Only} disables these terms. \\
+
+\texttt{panic\allowbreak{}Mean} & 0.45 & dimensionless & Fallback mean for a person's panic sensitivity if no \texttt{panic} distribution is supplied. \\
+
+\texttt{panic\allowbreak{}SD} & 0.2 & dimensionless & Fallback standard deviation for panic sensitivity. The panic envelope is sensitivity times (1 - exp(-t/60)); it scales a utility shock, not desired speed. \\
+
+\texttt{observe\allowbreak{}Radius} & 4 & metres & Neighborhood for local peer, queue, and counterflow observations. Neighbor queries use this radius in place of general target \texttt{vision\allowbreak{}Range}. \\
+
+\texttt{discovery\allowbreak{}Radius} & 2.2 & metres & Distance for learning a nearby disabled portal, subject to visibility. Managers have their own information rules and delayed notifications. \\
+
+\texttt{vision\allowbreak{}Range} & 12 & metres & General action-target visibility distance. Remembered or instructed actions can remain available beyond direct sight. Student routing bypasses this knowledge restriction. \\
+
+\texttt{field\allowbreak{}Of\allowbreak{}View\allowbreak{}Degrees} & 360 & degrees & Angular visibility cone. A smaller value uses motion direction, or stored heading when stationary. Manager communication has its own omnidirectional range and line-of-sight test. \\
+
+\texttt{peer\allowbreak{}Direction\allowbreak{}Tolerance\allowbreak{}Degrees} & 45 & degrees & Alignment tolerance for counting neighbors as choosing an action's direction. \\
+
+\texttt{queue\allowbreak{}Observation\allowbreak{}Distance} & 3 & metres & Distance around a target within which committed slow people can be perceived as a queue. \\
+
+\texttt{queue\allowbreak{}Speed\allowbreak{}Threshold} & 0.25 & m/s & Speed threshold in local queue estimates. It differs from the moving-person threshold used by norm observations. \\
+
+\texttt{row\allowbreak{}Block\allowbreak{}Wait\allowbreak{}Factor} & 1 & multiplier & Scale the perceived extra wait from observed opposing row blockage. The estimate uses accumulated blockage plus one decision interval. Zero removes this contribution. \\
+
+\texttt{perceived\allowbreak{}Queue\allowbreak{}Delay} & true & boolean & Include observed queue and row-block delays in perceived time. Does not remove physical queues or norm observations. \\
+
+\texttt{behavioral\allowbreak{}Only} & false & boolean & In local mode retain the four-weight utility and guidance, while dropping the extra distance and panic/residual terms. Legacy choice does not use this switch. Students bypass utility maximization. \\
+
+\texttt{behavior\allowbreak{}Mode} & local & local / legacy & Select current perceived next-target decisions or the retained legacy route-choice procedure. Students and optional guidance require current geometry with local behavior. \\
+
+\texttt{legacy\allowbreak{}Decision\allowbreak{}Interval} & 1.5 & seconds & Decision interval for archived geometry. Current two-plan geometry uses \texttt{decision\allowbreak{}Interval} even when \texttt{behavior\allowbreak{}Mode} is legacy. \\
+
+\texttt{relaxation\allowbreak{}Time} & 0.65 & seconds & Desired-velocity relaxation time in acceleration (desired velocity minus current velocity)/tau. Smaller values drive faster velocity adjustment. \\
+
+\texttt{obstacle\allowbreak{}Strength} & 0.8 & acceleration scale & Manuscript obstacle repulsion magnitude. Hard region and body constraints are independent of this soft force. \\
+
+\texttt{comfort\allowbreak{}Distance} & 0.15 & metres & Default manuscript obstacle exponential decay distance, unless overridden per person. \\
+
+\texttt{interaction\allowbreak{}Strength} & 0.4 & model scale & Legacy social-force interaction multiplier only. Not used by the manuscript interaction formula. \\
+
+\texttt{interaction\allowbreak{}Range} & 2.6 & metres & Neighbor cutoff for physical interactions and the neighbors passed to local avoidance. This is separate from behavioral observation range. \\
+
+\texttt{interaction\allowbreak{}Lambda} & 0.25 & model coefficient & Relative-velocity contribution to the manuscript interaction direction. Changing it changes anticipatory interaction geometry. \\
+
+\texttt{interaction\allowbreak{}N} & 1 & dimensionless & Angular attenuation shape of the lateral manuscript interaction term. \\
+
+\texttt{interaction\allowbreak{}NPrime} & 1 & dimensionless & Angular attenuation shape of the longitudinal manuscript interaction term. \\
+
+\texttt{max\allowbreak{}Speed\allowbreak{}Factor} & 1.35 & multiplier & Cap speed relative to the person's desired speed, alongside waypoint and per-tick displacement limits. \\
+
+\texttt{local\allowbreak{}Avoidance} & true & boolean & Enable predictive local velocity steering outside seat rows. Turning it off retains other physical constraints and forces. \\
+
+\texttt{avoidance\allowbreak{}Lookahead} & 0.65 & seconds & Closest-approach horizon for predictive steering. \\
+
+\texttt{passing\allowbreak{}Clearance} & 0.04 & metres & Additional predictive separation padding, reduced near contact. \\
+
+\texttt{progress\allowbreak{}Timeout} & 2 & seconds & Time without sufficient anchored displacement before a person is considered stalled for steering. It does not teleport a person or prescribe a new destination. \\
+
+\texttt{social\allowbreak{}Force\allowbreak{}Mode} & manuscript & manuscript / legacy & Select supplied desired, obstacle, and interaction force forms or retained legacy forces. Archived geometry uses legacy forces regardless. \\
+
+\end{longtable}
+
+}
+
+An additional optional policy key is \texttt{paired\allowbreak{}Randomness} (default false). When true, shocks use counter-keyed draws from seed, person, time bucket, kind, and choice, which prevents a different decision-option ordering from consuming a different shared RNG sequence. Optimization uses paired randomness; ordinary GUI runs retain the default unless overridden. It does not make all model configurations physically equivalent.
+
+
+\section{Geometry: coordinates, seats, and boundaries}
+
+The polar construction is x = r cos(theta), y = centerY + r sin(theta). Most geometry angle lists and angular bounds store fractions of pi. Explicit portal \texttt{angle} and entrance \texttt{aisle\allowbreak{}Angle} are already radians. This difference matters when editing JSON. Floor 0 is the first floor; floor 1 is the balcony. A transfer moves a person to a named landing on the other plan; two people on different floors do not collide merely because their drawn coordinates coincide.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{geometry.\allowbreak{}layout\allowbreak{}Version} & 2 & integer & Select current explicit two-plan geometry when at least 2. Older geometry uses archived construction and behavior paths. \\
+
+\texttt{geometry.\allowbreak{}center\allowbreak{}Y} & 7.5 & metres & Common y coordinate of the semicircular seating center. Explicit portal and entrance coordinates must be updated consistently after geometric changes. \\
+
+\texttt{geometry.\allowbreak{}aisle\allowbreak{}Half\allowbreak{}Width} & 1.3 & metres & Half-width of radial aisles, giving a nominal 2.6 m full width. Row construction reserves aisle space at block ends. \\
+
+\texttt{geometry.\allowbreak{}aisle\allowbreak{}Angles} & [0.025, 0.215, 0.405, 0.595, 0.785, 0.975] & fractions of pi & Six radial aisle directions. Seat construction also uses fixed outside angular bounds of 0.02 and 0.98 times pi. \\
+
+\texttt{geometry.\allowbreak{}plans[].\allowbreak{}id} & main; balcony & IDs & Plan identifiers used by portals and entrances. \\
+
+\texttt{geometry.\allowbreak{}plans[].\allowbreak{}floor} & 0; 1 & integer & Floor associated with each plan. \\
+
+\texttt{geometry.\allowbreak{}plans[].\allowbreak{}name} & descriptive labels & text & Display name of each plan. \\
+
+\texttt{geometry.\allowbreak{}geometry\allowbreak{}Status} & topology known; metric dimensions approximate & text & Documentation metadata; does not change movement. \\
+
+\texttt{geometry.\allowbreak{}completion\allowbreak{}Rule} & first\_floor\_exterior\_threshold & text & Descriptive/export metadata for the implemented first-floor threshold completion rule. Editing this string alone does not create a different completion algorithm. \\
+
+\texttt{geometry.\allowbreak{}unit\allowbreak{}Treatment} & equal units; identical radius; no wheelchair class & text & Descriptive metadata. Body properties come from distributions; this text does not create mobility classes. \\
+
+\end{longtable}
+
+}
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Section} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Section} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+orchestra & floor 0; capacity 527; firstR 6.7; step 0.64; rows 16; pitch 0.58 & metres where dimensional & Orchestra seat inventory. \\
+
+loge & floor 0; capacity 486; firstR 17.5; step 0.68; rows 7; pitch 0.60 & metres where dimensional & Elevated mezzanine/loge on the first plan. \\
+
+balcony & floor 1; capacity 316; firstR 16; step 0.68; rows 9; pitch 0.67 & metres where dimensional & Second-plan seat inventory. \\
+
+\end{longtable}
+
+}
+
+Each \texttt{geometry.\allowbreak{}sections[]} has \texttt{id}, \texttt{floor}, \texttt{capacity}, \texttt{first\allowbreak{}R}, \texttt{step}, \texttt{rows}, and \texttt{pitch}. \texttt{first\allowbreak{}R} is the first row radius, \texttt{step} the radial row increment, and \texttt{pitch} the nominal seat spacing used to assess row-block capacity. Seats are allocated to blocks by a largest-remainder procedure and then placed evenly; actual individual spacing need not equal pitch exactly. Current validation preserves the specified section capacities, totaling 1329. Seats are generated from these specifications, rather than individually traced from the seating drawings.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{geometry.\allowbreak{}orchestra\allowbreak{}Barrier.\allowbreak{}radius} & 16.9 & metres & Orchestra/loge barrier radial position. \\
+
+\texttt{geometry.\allowbreak{}orchestra\allowbreak{}Barrier.\allowbreak{}width} & 0.35 & metres & Barrier thickness, used in physical and visibility geometry. \\
+
+\texttt{geometry.\allowbreak{}orchestra\allowbreak{}Barrier.\allowbreak{}access\allowbreak{}Width} & 1.3 & metres & Width of the six barrier gaps. Keep explicit ACCESS portal widths consistent. \\
+
+\texttt{geometry.\allowbreak{}orchestra\allowbreak{}Barrier.\allowbreak{}access\allowbreak{}Angles} & same six fractions as aisleAngles & fractions of pi & Gap directions. \\
+
+\texttt{geometry.\allowbreak{}orchestra\allowbreak{}Barrier.\allowbreak{}access\allowbreak{}Length} & 1.5 & metres & Retained metadata. Current connector travel uses each ACCESS portal's \texttt{length} and \texttt{flights}. \\
+
+\texttt{geometry.\allowbreak{}zones.\allowbreak{}<zone>.\allowbreak{}floor} & orchestra/loge 0; balcony 1 & integer & Seating-zone floor. \\
+
+\texttt{geometry.\allowbreak{}zones.\allowbreak{}<zone>.\allowbreak{}min\allowbreak{}R}, \texttt{.\allowbreak{}max\allowbreak{}R} & see zone table & metres & Radial bounds of seating and radial aisle movement. \\
+
+\texttt{geometry.\allowbreak{}zones.\allowbreak{}<zone>.\allowbreak{}outer\allowbreak{}Region} & access / rim / balcony-rim & region ID & Named continuation from that seating zone. \\
+
+\end{longtable}
+
+}
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Zone} & \textbf{Default} & \textbf{Units/type} & \textbf{Continuation} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Zone} & \textbf{Default} & \textbf{Units/type} & \textbf{Continuation} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+orchestra & minR 6.3; maxR 16.525 & metres & access \\
+
+loge & minR 17.3; maxR 22.2 & metres & rim \\
+
+balcony & minR 15.7; maxR 22.75 & metres & balcony-rim \\
+
+\end{longtable}
+
+}
+
+Each \texttt{geometry.\allowbreak{}regions.\allowbreak{}<id>} has \texttt{floor} and \texttt{kind}. Annuli have \texttt{min\allowbreak{}R}, \texttt{max\allowbreak{}R}, \texttt{track\allowbreak{}R}, \texttt{min\allowbreak{}Angle}, and \texttt{max\allowbreak{}Angle}; rectangles have \texttt{min\allowbreak{}X}, \texttt{max\allowbreak{}X}, \texttt{min\allowbreak{}Y}, and \texttt{max\allowbreak{}Y}. Angular bounds are fractions of pi. Rectangle position bounds are inset for body radius. Annular radial bounds are permitted center positions and are not uniformly eroded by body radius. \texttt{track\allowbreak{}R} is used by explicit legacy behavioral arc-distance estimates; current local goals and shortest-route geometry do not force pedestrians to that radius.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Region} & \textbf{Default} & \textbf{Units/type} & \textbf{Use} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Region} & \textbf{Default} & \textbf{Units/type} & \textbf{Use} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+rim & floor 0; r 22.02 to 24.05; trackR 23.15; angle 0.012 to 0.988 & metres; fractions of pi & First-floor circulation outside loge. \\
+
+corridor & floor 0; r 24 to 27.3; trackR 25.5; angle 0.005 to 0.995 & metres; fractions of pi & Semicircular corridor beyond auditorium doors. \\
+
+balcony-rim & floor 1; r 22.57 to 24.5; trackR 23.15; angle 0.008 to 0.992 & metres; fractions of pi & Balcony circulation. \\
+
+foyer & floor 0; x -12.4 to 12.4; y 32.2 to 41.2 & metres & Main first-floor exit hall. \\
+
+stage-east & floor 0; x 21.5 to 24.25; y 3.8 to 6.8 & metres & Landing region for east stage-side stairs. \\
+
+stage-west & floor 0; x -24.25 to -21.5; y 3.8 to 6.8 & metres & Landing region for west stage-side stairs. \\
+
+\end{longtable}
+
+}
+
+\texttt{geometry.\allowbreak{}visibility\allowbreak{}Walls} defaults to an empty list. Each additional segment supplies \texttt{floor}, \texttt{start:\allowbreak{} \{x,\allowbreak{}y\}}, and \texttt{end:\allowbreak{} \{x,\allowbreak{}y\}} with finite, distinct endpoints. These segments obstruct observations, not physical movement. Built-in visibility boundaries include the first-floor orchestra barrier, corridor inner wall, and foyer walls. People and individual seat backs are not visibility occluders. To add a physical wall, changing this list alone is insufficient.
+
+
+\section{Portals and transfer entrances}
+
+The authoritative current map is \texttt{geometry.\allowbreak{}portals} plus \texttt{geometry.\allowbreak{}entrances}. Coordinates below remain explicit in \texttt{default\_\allowbreak{}world.\allowbreak{}json}; the schema and family tables describe every current field without repeating all coordinates. A portal threshold and its destination landing are different points and must be changed together when redesigning the map.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Portal field} & \textbf{Default/example} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Portal field} & \textbf{Default/example} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{id} & ACCESS1, AUD0, M0, etc. & unique text & Identity used by route graphs, closures, output, and explicit admission memory. \\
+
+\texttt{type} & access / door / stairs / exit / elevator & text & Connector behavior. Only first-floor exterior exit portals complete an evacuation. \\
+
+\texttt{from} & aisle, rim, corridor, etc. & region ID & Source circulation state eligible to use this portal. \\
+
+\texttt{floor}, \texttt{plan} & 0/main or 1/balcony & identifiers & Source floor and plan. \\
+
+\texttt{x}, \texttt{y} & explicit JSON coordinates & metres & Threshold position in the source plan. These are authoritative positions. \\
+
+\texttt{width} & family dependent & metres & Physical aperture, body fit, throughput, and observed queue delay estimate. \\
+
+\texttt{evacuation\allowbreak{}Allowed} & true except ADA\_W & boolean & Whether this connector belongs to the evacuation network. Elevator exclusion remains in force. \\
+
+\texttt{angle} & explicit radians where supplied & radians & Polar orientation for relevant circular portal approaches; unlike the fraction-of-pi geometry lists. \\
+
+\texttt{source\allowbreak{}Zone} & orchestra on ACCESS portals & zone ID & Restrict an aisle transfer to the correct seating zone. \\
+
+\texttt{to\allowbreak{}Entrance} & named landing & entrance ID & Destination for interior doors and access/stair transfers. This is how a balcony guest enters the first-floor plan. \\
+
+\texttt{length} & 1.5 / 15 / 12 & metres & Access/stair traversal length; kept consistent with the sum of flights. \\
+
+\texttt{flights} & [1.5], [7.5, 7.5], [12] & list of metres & Sequential connector flight distances and travel state. \\
+
+\texttt{lane\allowbreak{}Count} & 1 or 2 & integer & Number of connector lanes with independent spacing and occupancy. \\
+
+\texttt{lane\allowbreak{}Divider} & 0 or 0.1 & metres & Width subtracted before dividing the remaining connector width among lanes. \\
+
+\texttt{normal} & \{x: 0, y: 1\}, etc. & unit vector & Outward normal of exterior threshold, used for crossing and tangent aperture fit. \\
+
+\texttt{exit\allowbreak{}Id} & MAIN, SIDE\_E1, STAGE\_E, etc. & text & Reporting aggregation. M0 through M4 all contribute to MAIN. \\
+
+\texttt{rare} & true on side/stage routes & boolean & Descriptive metadata. There is no remaining familiarity coefficient or emergency-only toggle attached to this flag. \\
+
+\texttt{prohibited\allowbreak{}Reason} & ADA elevator explanation & text & Human-readable reason; \texttt{evacuation\allowbreak{}Allowed} implements the restriction. \\
+
+\end{longtable}
+
+}
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Portal family} & \textbf{Default} & \textbf{Units/type} & \textbf{Connection} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Portal family} & \textbf{Default} & \textbf{Units/type} & \textbf{Connection} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+ACCESS1 through ACCESS6 & six; width 1.3; length 1.5; flights [1.5]; one lane; divider 0 & metres & Orchestra aisle to corresponding LOGE\_ACCESS entrance. \\
+
+AUD0 through AUD8 & nine; width 1.35 & metres & Rim to corresponding CORRIDOR\_AUD entrance. \\
+
+F0 through F2 & three; width 1.65 & metres & Corridor to corresponding FOYER\_F entrance. \\
+
+M0 through M4 & five; width 1.75 each & metres & Foyer to exterior; combined MAIN width 8.75. \\
+
+SIDE\_E1, SIDE\_E2, SIDE\_W2, SIDE\_W1 & four; width 1.35 & metres & Corridor directly to exterior; available throughout ordinary runs. \\
+
+BACK\_E, BACK\_W & two; width 1.6; length 15; flights [7.5, 7.5]; two lanes; divider 0.1 & metres & Balcony rim to FOYER\_BACK landing. \\
+
+STAGE\_E, STAGE\_W & two; width 1.15; length 12; flights [12]; one lane; divider 0 & metres & Balcony rim to corresponding GROUND\_STAGE landing on floor 0. \\
+
+GROUND\_STAGE\_E, GROUND\_STAGE\_W & two; width 1.15 & metres & Stage-side first-floor landing to exterior. \\
+
+ADA\_W & one; width 1.2; evacuationAllowed false & metres & Elevator recorded in map but unavailable for evacuation. \\
+
+\end{longtable}
+
+}
+
+Each \texttt{geometry.\allowbreak{}entrances.\allowbreak{}<id>} supplies matching \texttt{id}, \texttt{plan}, \texttt{floor}, \texttt{region}, \texttt{x}, \texttt{y}, and \texttt{normal:\allowbreak{} \{x,\allowbreak{}y\}}. \texttt{zone} and \texttt{aisle\allowbreak{}Angle} are also supplied for aisle landings; \texttt{aisle\allowbreak{}Angle} is radians. The normal points into the destination and determines landing-depth probes and lane offsets. Current landings are six LOGE\_ACCESS entrances, nine CORRIDOR\_AUD entrances, three FOYER\_F entrances, two FOYER\_BACK entrances, and two GROUND\_STAGE entrances. All are on the first floor. Interior transitions do not mark a guest evacuated.
+
+
+Portal \texttt{enabled}, \texttt{tokens}, \texttt{passed}, and connector lane contents are runtime state, not additional independent world parameters. Closures alter enabled state; thresholds still require the appropriate source region, body fit, and crossing conditions.
+
+
+\section{Retained geometry and descriptive fields}
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Current status} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Current status} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{geometry.\allowbreak{}auditorium\allowbreak{}R} & 22.2 & metres & Archived geometry construction and related legacy/display calculations. Current seating zones and explicit regions are authoritative. \\
+
+\texttt{geometry.\allowbreak{}corridor\allowbreak{}R} & 25.2 & metres & Retained legacy route estimates and archived geometry. Does not move the current corridor or its explicit portals. \\
+
+\texttt{geometry.\allowbreak{}balcony\allowbreak{}R} & 22.75 & metres & Archived geometry/display field; current balcony bounds are explicit. \\
+
+\texttt{geometry.\allowbreak{}auditorium\allowbreak{}Doors} & [0.06, 0.17, 0.28, 0.39, 0.5, 0.61, 0.72, 0.83, 0.94] & fractions of pi & Archived portal generation. Current AUD portals have explicit coordinates and radians. \\
+
+\texttt{geometry.\allowbreak{}foyer\allowbreak{}Doors} & [0.44, 0.5, 0.56] & fractions of pi & Archived portal generation. Current F portals are explicit. \\
+
+\texttt{geometry.\allowbreak{}exits[]} & four side entries width 1.35; MAIN width 8.75 & summary objects & Each has \texttt{id}, \texttt{angle}, \texttt{width}, \texttt{type}. Used by archived geometry and retained legacy route estimates; changing these does not relocate current explicit exits. \\
+
+\texttt{geometry.\allowbreak{}stairs[]} & BACK\_E/W width 1.6 length 15; STAGE\_E/W width 1.15 length 12 & summary objects & Each has \texttt{id}, \texttt{angle}, \texttt{type}, \texttt{width}, \texttt{length}; angles are fractions of pi. Archived construction metadata; current portal objects control transfers. \\
+
+\texttt{geometry.\allowbreak{}exterior\allowbreak{}Context.\allowbreak{}simulated} & false & boolean & Descriptive context, not an outdoor-motion feature switch. \\
+
+\texttt{geometry.\allowbreak{}exterior\allowbreak{}Context.\allowbreak{}monumental\allowbreak{}Staircase} & x 0; y 43.5; width 14 & metres & Context metadata for outdoor stairs. Current illustration also contains its own drawing constants. \\
+
+\texttt{geometry.\allowbreak{}exterior\allowbreak{}Context.\allowbreak{}portico\allowbreak{}Staircases} & 2 & count & Descriptive context. Outdoor staircase traversal is outside the simulated completion process. \\
+
+\texttt{geometry.\allowbreak{}exterior\allowbreak{}Context.\allowbreak{}note} & threshold-completion explanation & text & Descriptive note. \\
+
+\end{longtable}
+
+}
+
+\section{Optional crowd managers}
+
+Settings below live in \texttt{crowd\allowbreak{}Managers}, not the policy-settings object. Exactly six stationary managers are supported. Without explicit positions, automatic placement greedily improves geometric signal coverage over all seats. This is an initialization heuristic, not a guarantee of minimum evacuation time. The simulation-based optimizer can then search placements. Managers are physical obstacles but do not add audience participants or moving peer observations.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{enabled} & false & boolean & Opt into crowd-manager bodies, information, and guidance. Students suppress these effects. Closure scenarios remain independently meaningful. \\
+
+\texttt{count} & 6 & people & Must equal six. \\
+
+\texttt{positions} & empty list & candidate IDs & Empty selects automatic initialization; otherwise supply six distinct feasible candidate IDs. Arbitrary x/y positions are not the placement interface. \\
+
+\texttt{strength} & 12 & utility units & Maximum manager utility bonus at zero distance before memory attenuation. Strictly positive. This is not acceleration. \\
+
+\texttt{decay\allowbreak{}Length} & 8 & metres & Signal decay length in exp(-distance/decayLength). The implementation is exponential, not inverse-square. \\
+
+\texttt{communication\allowbreak{}Range} & 12 & metres & Finite same-floor hearing/guidance range, also requiring line of sight. \\
+
+\texttt{memory\allowbreak{}Seconds} & 60 & seconds & Guidance memory duration and exponential age-decay time scale; stale remembered guidance expires. \\
+
+\texttt{manager\allowbreak{}Radius} & 0.2025 & metres & Stationary staff body radius, affecting feasible candidate sites and physical clearance. \\
+
+\texttt{require\allowbreak{}Both\allowbreak{}Floors} & true & boolean & Require at least one manager on each floor during initialization, layout validation, and search. \\
+
+\texttt{show\allowbreak{}Coverage} & false & boolean & GUI coverage outline only; the drawn outline is not a replacement for actual wall occlusion tests. \\
+
+\texttt{closures} & empty list & events & Schedule disabled evacuation portals. Physical availability and individual knowledge are separate states. \\
+
+\texttt{closures[].\allowbreak{}portal\allowbreak{}Id} & required & portal ID & Evacuation-allowed connector to disable. \\
+
+\texttt{closures[].\allowbreak{}at} & 0 & seconds & Nonnegative time of closure. Events are permanent; reopening and partial width loss are not represented. \\
+
+\texttt{closures[].\allowbreak{}notify\allowbreak{}After} & null & seconds or null & Null gives no automatic staff notification; zero informs staff immediately; a positive value delays notification after closure. Local discovery can still occur. \\
+
+\end{longtable}
+
+}
+
+Every occupied seat has an initially assigned manager. If that manager can currently communicate with the person, their instruction has priority over other audible managers. Otherwise the strongest eligible fallback manager is used, with deterministic tie-breaking. The next recommended action follows the manager's current shortest-distance route knowledge. Finite authority means ordinary utility can still favor a different action. Guidance strength depends on signal at reception and memory age; guests are not physically pulled toward the manager. A per-person responsiveness factor is initialized to one and is not a separate exposed configuration field.
+
+
+Candidate sites discretize staff placement, not pedestrian positions. They are sampled in aisles, circulation rings, and the foyer, excluding seats, portal approaches, incompatible overlaps, and narrow placements. Automatic initialization considers every seat, so it does not exploit the particular sampled audience occupancy.
+
+
+\section{Optional students and LED strips}
+
+Student mode chooses the currently shortest known feasible distance route, including connector distances, rather than maximizing behavioral utility. It supplies full layout knowledge but not automatic omniscience about unexpected closures. Students still discover obstructions and reroute. It does not explicitly optimize congestion, expected clearance time, or the social optimum. Ordinary physical movement remains the same. Crowd-manager and LED options do nothing to student movement.
+
+
+LED settings live in \texttt{led\allowbreak{}Strips}. An enabled strip network supplies a shortest-distance next-target recommendation and a constant utility bonus to the indicated action. The remaining behavioral utility stays active. Continuous strip coverage along the modeled walking network is assumed; exposure is not a photometric or distance-to-strip model.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{led\allowbreak{}Strips.\allowbreak{}enabled} & false & boolean & Opt into LED instructions for nonstudents. Does not create managers. Requires current two-plan geometry and local behavior. \\
+
+\texttt{led\allowbreak{}Strips.\allowbreak{}strength} & 12 & utility units & Nonnegative constant bonus for the indicated next action. Comparable to the maximum near-manager bonus, but without spatial or memory decay. Zero removes both instructions and their bonus. It is not a physical force or speed multiplier. \\
+
+\texttt{led\allowbreak{}Strips.\allowbreak{}adaptive} & true & boolean & Controller instantly reads currently disabled evacuation portals and updates shortest routes. This is an explicit controller-information assumption; guests receive a next-target instruction, not a global closure list. False freezes the initial strip-network closure knowledge. A person rejects a stale instruction if they already know its route is blocked. \\
+
+\texttt{led\allowbreak{}Strips.\allowbreak{}show\allowbreak{}Strips} & true & boolean & Draw the green route network, including curves around annular holes and local row/aisle branches. Read-only display; does not alter random draws or decisions. \\
+
+\end{longtable}
+
+}
+
+Managers and LEDs may coexist for nonstudents, adding their separate utility bonuses. Students suppress both. Neither guide guarantees compliance at finite strength. Optional LED counters report decisions offered guidance, decisions following it, and choices changed by its bonus; these are outputs, not parameters. The full mathematical explanation is in \texttt{LED\_\allowbreak{}GUIDANCE.\allowbreak{}tex}.
+
+
+\section{Fixed implementation constants that also affect behavior}
+
+The following are code constants, not JSON tuning parameters. Changing them requires a code change and should be recorded as a model change.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Constant} & \textbf{Default} & \textbf{Units/type} & \textbf{Effect} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Constant} & \textbf{Default} & \textbf{Units/type} & \textbf{Effect} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+Door refill & 1.3 times width & people/second & Token throughput coefficient when doorCapacity is enabled. \\
+
+Door token initialization/cap & max(1, 1.2 times width) / max(1, 1.35 times width) & tokens & Initial burst and accumulated-token ceiling. \\
+
+Interior portal proximity & 0.65 & metres & Proximity condition for attempting transfer; aperture fit also uses body radius and 0.01 m padding. \\
+
+Connector speed & access max(0.4, desired speed); stairs max(0.4, 0.7 times desired speed) & m/s & Transfer travel rate. Flights are timed rather than drawn as planar walking. \\
+
+Connector headway & max(0.35, (2 radius + 0.1)/speed) & seconds & Minimum same-lane entry separation. \\
+
+Connector occupancy & max(1, floor(total length/(2 radius + 0.1))) & people/lane & Lane occupancy cap. Lane width must exceed body diameter plus 0.02 m. \\
+
+Landing probes & 0, 0.25, 0.5, 0.75 & metres & Candidate depths along landing normal, combined with lane offset and clearance tests. \\
+
+Hard separation factor & 1.005 on squared diameter sum & dimensionless & Small additional margin in body exclusion. \\
+
+Maximum displacement & 0.7 & metres/tick & Per-tick movement cap. This is another reason large dt changes cannot be treated as pure playback changes. \\
+
+Panic envelope time & 60 & seconds & Growth time constant of the panic shock envelope. \\
+
+Moving norm cutoff & 0.12 & m/s & Minimum neighbor motion used in direction-based norm observations. \\
+
+Opposing direction cutoff & dot product below -0.15 & dimensionless & Identify opposing motion for local norm features. \\
+
+Progress anchor displacement & 0.12 & metres & Displacement needed to refresh anchored progress for stalled steering. \\
+
+Waypoint tolerance & 0.025 & metres & Small-goal arrival tolerance. \\
+
+Predictive steering directions & 0, plus/minus 20, 40, 65, 90, 120, and 180 & degrees & Candidate directions, tested at full and half speed, with directional scoring constants. \\
+
+Row tolerances & radial 0.07; angular 0.012 & metres; radians & Constrain seat-row movement and related geometry checks. \\
+
+Route knowledge cache & 64 & fields & Bounded shortest-route knowledge-field cache; a performance control, not a behavioral weight. \\
+
+\end{longtable}
+
+}
+
+Small numerical epsilons throughout geometry and force code protect divisions, boundary comparisons, and degeneracies. They should not be interpreted as empirical psychological parameters.
+
+
+\section{CLI overrides and experiment parameters}
+
+\texttt{python run.\allowbreak{}py -\allowbreak{}-\allowbreak{}gui} opens the desktop application; \texttt{python run.\allowbreak{}py} runs headlessly. Relative output paths are resolved under the Python port directory. World and settings JSON files have different schemas: \texttt{-\allowbreak{}-\allowbreak{}config} loads a world, while \texttt{-\allowbreak{}-\allowbreak{}settings} overrides the bundled policy constructor settings.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{CLI parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{CLI parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{-\allowbreak{}-\allowbreak{}population}, \texttt{-\allowbreak{}-\allowbreak{}n}; \texttt{-\allowbreak{}-\allowbreak{}seed}; \texttt{-\allowbreak{}-\allowbreak{}dt}; \texttt{-\allowbreak{}-\allowbreak{}max-\allowbreak{}seconds} & world values & run controls & Override the corresponding world fields. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}ticks} & absent & ticks & Additional tick-count stopping limit. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}config} & bundled world & JSON path & Load a complete world configuration. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}settings} & bundled policy settings & JSON path & Override policy settings. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}policy} & bundled policy & Python path & Load trusted editable policy code. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}disable-\allowbreak{}portal} & none & repeatable ID & Disable specified portal(s) after setup. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}students}, \texttt{-\allowbreak{}-\allowbreak{}no-\allowbreak{}students} & world setting & flags & Explicit student-mode override. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}crowd-\allowbreak{}managers}, \texttt{-\allowbreak{}-\allowbreak{}no-\allowbreak{}crowd-\allowbreak{}managers} & world setting & flags & Explicit manager-mode override. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}manager-\allowbreak{}settings} & absent & JSON path & Load the optional crowd-manager settings object. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}led-\allowbreak{}strips}, \texttt{-\allowbreak{}-\allowbreak{}no-\allowbreak{}led-\allowbreak{}strips} & world setting & flags & Explicit LED-mode override. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}led-\allowbreak{}strength} & world/module setting & utility units & Override LED strength. Does not itself enable LED mode. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}led-\allowbreak{}settings} & absent & JSON path & Load the optional LED settings object. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}no-\allowbreak{}collisions}, \texttt{-\allowbreak{}-\allowbreak{}no-\allowbreak{}regions}, \texttt{-\allowbreak{}-\allowbreak{}no-\allowbreak{}door-\allowbreak{}capacity} & absent & flags & Disable corresponding limits. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}output}, \texttt{-\allowbreak{}-\allowbreak{}csv} & absent & output paths & Write detailed run JSON and agent CSV. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}include-\allowbreak{}weights} & false & flag & Append four behavioral weight columns to CSV; does not change behavior. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}gui}, \texttt{-\allowbreak{}-\allowbreak{}animate} & false & flags & Launch desktop editor/viewer. \\
+
+\end{longtable}
+
+}
+
+The manager optimizer separates search settings from physical model parameters. Search changes which layouts are evaluated; it does not change audience mechanics. Its finite placement domain and heuristic search provide a best tested layout, not a proof of global optimality.
+
+
+{\small\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{@{}p{0.23\linewidth}p{0.19\linewidth}p{0.13\linewidth}p{0.38\linewidth}@{}}
+
+\toprule
+
+\textbf{Optimizer parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endfirsthead
+
+\toprule
+
+\textbf{Optimizer parameter} & \textbf{Default} & \textbf{Units/type} & \textbf{Meaning} \\
+
+\midrule\endhead
+
+\bottomrule\endfoot
+
+\texttt{-\allowbreak{}-\allowbreak{}n} & 300 & guests & Audience size per evaluation. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}config} & bundled world & JSON path & Base building and run configuration for evaluations. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}training-\allowbreak{}seeds} & [2026] & seeds & Repeated audience/noise samples used to rank layouts. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}validation-\allowbreak{}seeds} & [7] & seeds & Disjoint held-out samples for validation; not used to select the layout. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}search-\allowbreak{}population} & 6 & layouts & Number of layouts retained in the population; at least two. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}generations} & 3 & iterations & Number of generations after the initial population. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}search-\allowbreak{}seed} & 314159 & seed & Independent randomness for layout search. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}max-\allowbreak{}seconds} & 180 & seconds & Evaluation horizon; incomplete runs remain failures/censored outcomes. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}manager-\allowbreak{}settings}, \texttt{-\allowbreak{}-\allowbreak{}settings} & optional overrides & JSON paths & Manager and bundled-policy constructor settings for evaluations. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}scenarios} & configured closures, else open & JSON path & Named scenarios with positive weights and closure-event lists. Weights are normalized over scenarios and evaluation seeds. \\
+
+\texttt{-\allowbreak{}-\allowbreak{}output}; \texttt{-\allowbreak{}-\allowbreak{}layout-\allowbreak{}output} & required report; optional layout & paths & Save evaluation report and an optionally reusable manager configuration. \\
+
+\end{longtable}
+
+}
+
+Optimizer scenario records use \texttt{name}, \texttt{weight} (default one), and \texttt{closures} (default empty). Closure entries use the schema above. Ranking first penalizes incomplete-run frequency, then remaining audience fraction, then restricted clearance. Mean full-clearance time is meaningful as the primary clearance objective only when all relevant runs finish. Student mode is rejected for manager optimization because it suppresses manager effects.
+
+
+\texttt{compare\_\allowbreak{}student\_\allowbreak{}audiences.\allowbreak{}py} exposes \texttt{-\allowbreak{}-\allowbreak{}populations} (default 300 and 600), \texttt{-\allowbreak{}-\allowbreak{}seeds} (default 2026, 7, 17), \texttt{-\allowbreak{}-\allowbreak{}max-\allowbreak{}seconds} (180), optional \texttt{-\allowbreak{}-\allowbreak{}dt}, \texttt{-\allowbreak{}-\allowbreak{}random-\allowbreak{}stream} (paired by default, or original), and required \texttt{-\allowbreak{}-\allowbreak{}output-\allowbreak{}dir}. These control an analysis batch and its records, not new movement parameters. Keep integration dt, physics, seed sets, occupancy, stopping horizon, and random-stream mode explicit when interpreting any future comparison.
+
+
+\section{Implementation sources}
+
+\texttt{config.\allowbreak{}py} validates world schemas and public run limits; \texttt{engine.\allowbreak{}py} samples people, advances time, enforces collisions and portal transfers, and assembles active options. \texttt{geometry.\allowbreak{}py} and \texttt{plans.\allowbreak{}py} generate seats and test geometry. \texttt{perception.\allowbreak{}py} controls visibility. \texttt{behavior.\allowbreak{}py} constructs local actions, observations, and features, then combines supplied weights, shocks, and guidance. \texttt{user\_\allowbreak{}model.\allowbreak{}py} samples weights and shocks and selects behavioral and force modes; \texttt{social\_\allowbreak{}force.\allowbreak{}py} implements physical forces. \texttt{crowd\_\allowbreak{}routes.\allowbreak{}py} provides shortest-distance route fields; \texttt{crowd\_\allowbreak{}managers.\allowbreak{}py} adds optional staff and closure knowledge; \texttt{led\_\allowbreak{}guidance.\allowbreak{}py} adds optional constant utility instructions. CLI, viewer, optimizer, and comparison scripts add execution, display, and experiment controls. The defaults and source remain authoritative if future edits change this reference.
+
+\end{document}

@@ -1,0 +1,638 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{.5em}
+\newcommand{\ind}{\mathbf{1}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\title{Optional Six-Manager Evacuation Experiment\\Mathematical Construction, Placement Search and Initial Results}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document specifies the implemented optional crowd-manager model and
+summarizes the saved experiments with 300 audience members. Six stationary
+managers communicate shortest-distance routes with proximity-dependent
+authority, while guests retain their existing behavioral preferences. Physical
+closures and knowledge of closures are modeled separately. A discrete genetic
+search evaluates placements through repeated microscopic simulations. In the
+ordinary-policy reproduction, automatic placement reduced total clearance from
+60.443 to 58.742 seconds. With counter-keyed paired randomness, the corresponding
+initial-layout comparison was 58.638 versus 58.188 seconds. Small placement
+searches improved training performance, but a placement selected across blockage
+scenarios was slower on a held-out audience. These are preliminary computational
+results, without statistical or global-optimality guarantees.
+The numerical results were obtained before the assigned-manager-priority
+revision below; they describe the earlier strongest-signal selection rule.
+\end{abstract}
+
+\section{Experimental scope and baseline}
+The existing model remains the default. Setting
+\code{crowdManagers.enabled=true} enables six stationary managers; omitting
+this object or setting its flag to false adds no staff, route graph, guidance
+utility, or agent guidance records. Closure-only comparisons may explicitly
+retain scheduled closures while disabling staff. The original four-dimensional
+behavioral weights, their covariance, and the three-second default decision
+interval remain unchanged.
+The separate student-audience option overrides this experiment: with
+\code{studentMode=true}, no crowd managers are active even if their stored
+flag is enabled. Students directly minimize graph distance. Physical closure
+schedules can remain in effect without staff or notifications. See
+\code{STUDENT_MODE.tex}; the historical results here concern the ordinary
+behavioral audience, not student mode.
+
+There are $n$ audience members and exactly six additional staff discs.
+The verification runs use $n=300$. Staff do not contribute to audience
+population, completion counts, peer shares, or stair queues. Their stationary
+bodies do participate in physical collision exclusion and interpersonal forces.
+Geometry, velocities and times retain the units in
+\code{BUILDING_SPECIFICATION.tex}. Geometry is schematic, not surveyed.
+
+\subsection{Existing behavioral utility}
+An action $a$ identifies a next local target. Let
+$\mathcal A_i^{\mathrm{phys}}(t)$ denote physically available actions and
+$\mathcal A_i^{\mathrm{obs}}(t)$ those currently visible, remembered, instructed,
+or the sole permitted aisle continuation. The latter set is used for choice.
+Manager directions can therefore change both information and utility.
+
+The behavioral component is
+\[
+ B_i(a,t)=-w_{Ti}T_i(a,t)+w_{Pi}P_i(a,t)
+                   -w_{Ni}N_i(a,t)-w_{Si}C_i(a,t).
+\]
+Here $T_i$ is perceived normalized travel time, $P_i$ the fraction of observed
+nearby people with aligned intended direction, $N_i$ the maximum of the
+counterflow and queue-cutting cues, and $C_i$ the indicator for abandoning an
+existing target in the current stage. Familiarity is absent.
+
+In the present configuration,
+\[
+ T_i=\frac{d_i^{\mathrm{loc}}/\max(0.35,v_i^0)
+                  +\widehat W_i^{\mathrm{queue}}+\widehat W_i^{\mathrm{row}}}
+                 {t_0},\qquad t_0=1\ \mathrm{s},
+\]
+with distances in metres and speeds in metres per second.
+$d_i^{\mathrm{loc}}$ is the existing policy's local-target distance, which is
+distinct from the manager graph's downstream distance and the manager--guest
+communication distance. Queue delays use observed older waiters ahead; the
+row-delay cue reflects experienced blockage by opposing row movement.
+
+The four weights are sampled once per guest:
+\[
+ \mathbf z_i\sim\mathcal N_4(-\tfrac12\mathbf 1,\Sigma),\qquad
+ \mathbf w_i=\exp(\mathbf z_i),\qquad
+ \Sigma=(1-\rho)I_4+\rho\mathbf 1\mathbf 1^{\mathsf T},
+ \quad\rho=-0.15.
+\]
+Exponentiation is componentwise. Each marginal latent variance is one, so
+$\mathbb E[w_{ji}]=1$; this does not impose a fixed sum for each person.
+
+With the default \code{behavioralOnly=false}, the complete pre-guidance utility
+also contains the existing distance and stochastic terms:
+\begin{align}
+ U_i^{\mathrm{existing}}(a,t)
+ &=D_i(a,t)+B_i(a,t)+\Pi_i(a,t)+\epsilon_i(a,t),\\
+ D_i(a,t)&=\left(\frac{d_{i,\min}^{\mathrm{loc}}+d_0}
+                            {d_i^{\mathrm{loc}}+d_0}\right)^{\beta_i},
+             \qquad d_0=1\ \mathrm{m},\\
+ \Pi_i(a,t)&=p_i\left(1-e^{-t/(60\,\mathrm{s})}\right)\delta_i(a,t).
+\end{align}
+Here $\beta_i\in[0,1]$ is the sampled distance sensitivity and $p_i\in[0,1]$
+the sampled panic sensitivity. The panic and residual shocks have marginal
+distribution $\mathcal N(0,0.2^2)$ and are held per option in 15-second buckets.
+Given an instruction, the actual decision is
+\[
+ a_i^*(t)\in\arg\max_{a\in\mathcal A_i^{\mathrm{obs}}(t)}
+                 \{U_i^{\mathrm{existing}}(a,t)+G_i(a,t)\}.
+\]
+Thus shortest-distance guidance is a recommendation within a heterogeneous
+utility model; it is not a deterministic assignment of all guests to routes.
+
+\subsection{Coupling to physical movement}
+The selected action supplies the existing legal local waypoint. In the
+manuscript force mode the acceleration contains
+\[
+ \dot{\mathbf v}_i=
+ \frac{v_i^0\widehat{\mathbf e}_i-\mathbf v_i}{\tau}
+ +\mathbf f_i^{\mathrm{obs}}
+ +\sum_{j\in\mathcal N_i^{\mathrm{aud}}}\mathbf f_{ij}^{\mathrm{int}}
+ +\sum_{m\in\mathcal N_i^{\mathrm{staff}}}\mathbf f_{im}^{\mathrm{int}},
+ \qquad \tau=0.65\ \mathrm{s}.
+\]
+Staff have $\mathbf v_m=\mathbf 0$ and use the same interpersonal interaction
+law within the 2.6-metre cutoff. They are excluded from the behavioral peer
+denominator. Hard-body tests additionally require
+\[
+ \|\mathbf x_i-\mathbf y_m\|^2
+       \geq 1.005\,(r_i+r_M)^2
+\]
+on the same plane. Euler integration, speed limits, region constraints and the
+optional local collision-avoidance layer are retained. Guidance supplies no
+extra physical force pointing toward the manager's body.
+
+\section{Directed distance graph}
+Let $G=(V,A)$ be the graph of declared movement states. A vertex contains a
+floor, region, position, and where necessary a seating zone. Vertices represent
+portal departures, named destination entrances, radial aisle ends, and their
+circulation-region counterparts. Coordinate overlap never creates an edge
+between distinct floors or regions. Elevator departures are excluded.
+
+An edge $a=(u,v)$ has nonnegative length $L_a$ in metres. Its cost contains no
+crowd delay, speed, utility, or capacity coefficient. Ordinary portal transfers
+use the distance between declared departure and landing. Stair and access
+transfers use their declared physical traversal lengths, including all flights.
+Radial aisle edges point outward, reflecting the implemented action set.
+Circulation edges connect pairs in the same declared region.
+
+\subsection{Within-region distance}
+In a convex rectangular region the cost is Euclidean distance. In an annular
+sector with inner centre-boundary radius $R$, put
+\[
+ r_j=\|\mathbf x_j-\mathbf c\|,\quad
+ \Delta=|\theta_1-\theta_2|,\quad
+ \alpha_j=\arccos(R/r_j).
+\]
+For the current sectors, whose angular width is at most $\pi$,
+\[
+ d(\mathbf x_1,\mathbf x_2)=
+ \begin{cases}
+ \|\mathbf x_1-\mathbf x_2\|,&\Delta\leq\alpha_1+\alpha_2,\\
+ \sqrt{r_1^2-R^2}+\sqrt{r_2^2-R^2}
+       +R(\Delta-\alpha_1-\alpha_2),&\text{otherwise}.
+ \end{cases}
+\]
+The second case joins two tangents by an inner-boundary arc. Both paths stay
+inside the outer disk. The mechanical annular bounds are already centre
+bounds; no additional body erosion is applied to this expression. Points
+within $10^{-10}\max(1,R)$ of the inner boundary are snapped to $R$ to avoid
+square-root/inverse-cosine amplification of coordinate roundoff.
+
+This is a reference distance in the reduced schematic graph. Actual movement
+uses the existing legal waypoints and social-force integrator; its realized
+length and time can exceed the graph reference. The graph is not a navigation
+mesh resolving every architectural detail.
+
+\subsection{Rows and seat-to-exit routes}
+For each legal row-side action, the attachment length is the remaining curved
+row distance to its aisle edge, one aisle half-width to the aisle centre, and
+the outward radial distance to the aisle's declared end. This explicit
+row-to-aisle abstraction avoids a straight line through seating blocks.
+The small mechanical row-to-aisle repositioning is therefore represented by
+a finite reference length even though it is not continuously integrated.
+
+Let $B$ be a set of known closed portal IDs. Transfer edges for $B$ and final
+threshold seeds in $B$ are removed. The reverse multi-source Dijkstra field is
+\[
+ D_B(v)=\min_{\pi:v\leadsto V_{\mathrm{exit}}(B)}\sum_{a\in\pi}L_a,
+\]
+where $V_{\mathrm{exit}}(B)$ contains only exterior-threshold vertices whose
+portal IDs are not in $B$, and paths use the remaining transfer edges.
+For a proposed local action $a$, compute
+\[
+ Q_B(i,a)=L_{i,a}+D_B(v_a).
+\]
+For a portal action, $L_{i,a}$ includes the chosen portal's transfer and
+$v_a$ is its landing: visiting a portal marker and walking past it cannot
+receive credit for using that portal. An exterior action ends at its threshold.
+The recommendation is a minimizer of $Q_B$ over physical local actions,
+including actions not previously known to the guest. Exact ties use stable
+action/exit IDs; Dijkstra uses deterministic traversal with a $10^{-10}$ metre
+strict-improvement tolerance to avoid cycles at zero-length links.
+
+Every seat receives an initial all-open reference route. Later instructions
+are recomputed from current position and current knowledge. Unreachable states
+produce a null route, never an invented escape or non-finite JSON value.
+At most 64 knowledge-specific fields are retained in an LRU cache.
+
+\section{Placement domain and responsibility}
+Generate a finite candidate set $C$ in aisles, circulation bands, and foyer.
+Each site is checked against region legality, all generated seat centres, and
+portal approach clearances. The current candidates reserve at least
+$0.85+r_M$ metres from portal centres and $r_M+0.2025+0.08$ metres from seat
+centres. These are experimental placement restrictions, not measured rules.
+The default world yields 110 candidates and an 85-vertex route graph.
+
+Choose $M\subseteq C$ with $|M|=6$. Staff pairs on the same floor must be at
+least $2r_M+0.08$ metres apart. By default, both occupied floors must have at
+least one manager; the remaining allocation is optimized. This constraint can
+be disabled explicitly. Candidate generation is placement discretization,
+not a discretization of continuous audience motion.
+
+Every seat is assigned a responsible manager using strongest initial signal,
+then same-floor proximity and a stable identifier to break ties. An uncovered
+seat still has an assignment, which does not imply it can hear the manager.
+The assignment remains fixed throughout the run and has priority when several
+managers can communicate with that person. Other managers can provide fallback
+instructions when the assigned manager cannot be heard.
+
+\section{Signal, utility and remembered instructions}
+For audience member $i$ and manager $m$, define
+\[
+ q_{im}(t)=\ind\{\ell_i=\ell_m\}
+ \ind\{d_{im}\leq R_c\}\ind\{\text{line of sight}\}
+ \exp(-d_{im}/\lambda).
+\]
+Here $d_{im}$ is Euclidean distance on the same plan. The existing schematic
+walls occlude communication. Communication is omnidirectional; a guest's
+visual field need not point toward the manager. No cross-floor audio, acoustic
+propagation, speech-service capacity, or communication delay is modeled.
+
+Let $m_i^0$ be the manager initially assigned to guest $i$, and let
+$\mathcal H_i(t)=\{m:q_{im}(t)>0\}$ contain the managers whose instructions
+can currently be received. The selected manager is
+\[
+ m_i^*(t)=
+ \begin{cases}
+ m_i^0,&m_i^0\in\mathcal H_i(t),\\
+ \displaystyle\arg\max_{m\in\mathcal H_i(t)}q_{im}(t),
+       &m_i^0\notin\mathcal H_i(t),\ \mathcal H_i(t)\ne\varnothing.
+ \end{cases}
+\]
+Fallback signal ties use a stable manager identifier. When $\mathcal H_i(t)$
+is empty, no new instruction is received; an existing valid remembered
+instruction may remain active. Receiving fallback guidance does not reassign
+$m_i^0$. If the original manager becomes receivable again, it regains priority.
+This preference does not bypass floor, range or wall-occlusion restrictions,
+and does not guarantee obedience to the selected instruction.
+
+Only the selected manager supplies a new instruction; signals do not add.
+The utility bonus uses that manager's actual signal, even if another manager
+has a stronger signal. In the original experiments reported later, selection
+instead always used the strongest receivable signal; their results have not
+been recomputed under assigned-manager priority.
+Managers use the building graph and their own closure knowledge. On receiving
+an instruction, the guest learns the recommended target and portal sequence.
+Let $t_r$ be receipt time, $q_r$ its received signal, and $\tau_M$ the memory
+horizon. While its route is valid and $0\leq t-t_r\leq\tau_M$, the bonus is
+\[
+ G_i(a,t)=\kappa\gamma_iq_r e^{-(t-t_r)/\tau_M}
+             \ind\{a=a_i^{\mathrm{instruction}}(t)\}.
+\]
+The implemented utility is
+\[
+ U_i^{\mathrm{guided}}(a,t)=U_i^{\mathrm{existing}}(a,t)+G_i(a,t).
+\]
+The existing utility includes its optional distance, panic and residual terms;
+with \code{behavioralOnly=true}, it consists of the original four-factor dot
+product plus guidance. Guidance does not restore familiarity. Initially
+$\gamma_i=1$ for everyone, without an additional random draw.
+
+At a region transition outside communication range, a remembered instruction
+advances only to an eligible portal already in the received sequence, or the
+single physical aisle continuation. It does not run a new global search.
+New instructions refresh memory. Expiry or learning that the stored route
+contains a blocked portal invalidates it. Expiry removes the authority bonus;
+previously learned target locations remain known. The bonus is finite, so
+unbounded behavioral weights can still lead to noncompliance.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Parameter & Default & Meaning\\
+\midrule
+$\kappa$ & 12 & Maximum utility bonus\\
+$\lambda$ & 8 m & Spatial decay length\\
+$R_c$ & 12 m & Communication range\\
+$\tau_M$ & 60 s & Memory horizon and decay scale\\
+$r_M$ & 0.2025 m & Stationary staff body radius\\
+$\gamma_i$ & 1 & Guest responsiveness\\
+\bottomrule
+\end{tabular}
+\end{center}
+These are transparent experimental defaults, not fitted behavioral estimates.
+Hold them fixed during placement optimization; use separate sensitivity studies.
+
+\section{Physical closures and knowledge}
+Each permanent closure specifies portal ID, onset $t_b$, and optional staff
+notification delay $\delta$. The portal becomes unavailable at the first tick
+with $t\geq t_b$, before decisions and motion; it cannot be crossed even if
+everyone still believes it open. Tick-level onset is conservative within at
+most one integration step. A null delay means no automatic broadcast.
+
+Managers learn the closure from scheduled notification at $t_b+\delta$,
+their own local observation within the existing discovery radius, or a report
+from a guest receiving their instruction. A guest receives the heard manager's
+knowledge and also retains its original local discovery mechanism. A manager
+can therefore recommend an actually closed route while still uninformed.
+Writing $B^{\mathrm{true}}(t)$, $B_i(t)$ and $B_m(t)$ for physical, guest and
+manager closure sets makes this distinction explicit. During receipt from
+manager $m$, both parties exchange their known closures, producing
+$B_i\leftarrow B_i\cup B_m$ and $B_m\leftarrow B_i\cup B_m$; the route query
+uses this combined knowledge. There is no query of $B^{\mathrm{true}}$ inside
+the shortest-path algorithm. Valid information can arrive through observation,
+notification or reporting, so knowledge need not remain absent until the
+scheduled notification time.
+Manager-to-manager broadcasts are not simulated. Reports are processed in the
+engine's seeded sequential order; scheduled news is applied at tick boundaries.
+Reopening and partially reduced capacity are not implemented by this schedule.
+Closing one of five foyer doors differs from closing all five; each has its own
+portal ID. To close a bank, supply an event for every affected portal.
+
+\section{Simulation-based placement optimization}
+First initialize with greedy marginal coverage
+\[
+ H(M)=\sum_{i\in\text{all seats}}\max_{m\in M}q_{im}(0).
+\]
+This is only an initialization proxy. Add random feasible layouts to obtain a
+genetic population. A chromosome is a sorted tuple of six distinct candidate
+IDs; permutations are one layout. Tournament selection, crossover from the
+parent site union, one or two replacement mutations, feasibility rejection,
+and one elite define each new generation. A separate seeded search RNG never
+changes the audience RNG. Cached layouts are simulated once per training set.
+
+Let $s$ index closure scenarios with positive weight $p_s$ and $r$ index equal
+weight training audience seeds. Normalize $w_{sr}=p_s/(R\sum_s p_s)$.
+With horizon $H$, remaining audience $N_{sr}(M)$, and true clearance time
+$T_{sr}(M)$ only when all exit, minimize the lexicographic vector
+\[
+ J(M)=\left(
+ \sum_{sr}w_{sr}\ind\{N_{sr}>0\},\quad
+ \sum_{sr}w_{sr}\frac{N_{sr}}{n},\quad
+ \sum_{sr}w_{sr}\widetilde T_{sr}\right),
+\]
+where $\widetilde T_{sr}=T_{sr}$ on completion and $H$ otherwise.
+Thus incomplete runs are retained and rank behind complete runs. When all
+complete, the third component is mean total clearance time. A capped time is
+not reported as actual clearance. Scenario weights are user assumptions; equal
+example weights are not empirical blockage probabilities.
+
+The optimizer evaluates $P$ initial layouts and at most $(P-1)$ new layouts per
+subsequent generation; with $K$ generations, $S$ scenarios and $R$ training
+seeds the bound is $[P+K(P-1)]SR$ training simulations before cache reuse.
+Held-out evaluation adds two runs per validation seed/scenario: no managers
+and the selected six-manager layout. Validation seeds must be disjoint from
+training seeds and never select a layout. This heuristic returns the best found
+placement on $C$, with no global or continuous-domain optimality guarantee.
+
+\section{Paired randomness and diagnostics}
+Audience initialization retains the original seeded RNG. The optimizer enables
+an optional counter-based shock stream keyed by
+\code{(seed,agentId,noiseBucket,kind,actionId)} using SHA-256 and Box--Muller.
+Hence a changed action set cannot shift another person's residual or the
+mechanical shuffle RNG. A fingerprint verifies matching seats, traits, weights,
+panic and distance sensitivity across baseline/guided validation pairs. Ordinary
+runs retain the original stream unless \code{pairedRandomness=true} is supplied.
+
+Reports contain training objectives, search history, settings, layouts, scenario
+definitions, seed sets, matched fingerprints, held-out paired differences,
+$T_{95}$, completion status, exit usage, adherence and observed queue peaks.
+Adherence includes single-action continuation stages; it is an implementation
+diagnostic, not an independently estimated probability of obeying staff.
+For each decision, the implementation also records the winner after subtracting
+only the guidance bonus from the same offered actions. A difference increments
+\code{changedChoiceDecisions}. This local comparison retains the crowd state,
+information and shocks; it does not estimate a full no-manager causal outcome.
+The queue proxy counts slow agents with a committed queue target within the
+existing observation distance, sampled at tick boundaries. It is not pressure,
+hazard exposure, or a calibrated safety-density measure. Null values identify
+unattained quantiles and incomplete clearance. JSON uses no infinity/NaN.
+
+\section{Configuration used in the saved experiments}
+All results below use the two-plan schematic auditorium, 300 audience members
+and, when enabled, six additional stationary managers. The audience contains
+119 orchestra, 110 loge and 71 balcony guests. Completion requires crossing a
+first-floor exterior threshold; an interior transfer does not count as exit.
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Setting & Experimental value\\
+\midrule
+Integration step & $\Delta t=0.1$ s\\
+Decision interval & 3 s, with immediate stage/closure reconsideration\\
+Verification/search horizon & 120 s; all reported runs completed\\
+Latent weight standard deviation/correlation & $\sigma=1$, $\rho=-0.15$\\
+Time normalization & $t_0=1$ s\\
+Shock standard deviation/bucket & 0.2 utility units / 15 s\\
+Preferred speed & Clipped normal: $\mu=1.29$, $s=0.19$ m/s\\
+Preferred speed bounds & 0.5--2.3 m/s\\
+Reaction delay & Clipped lognormal: nominal mean 2 s, SD 1.2 s\\
+Reaction delay bounds & 0--40 s\\
+Guest and staff radii & 0.2025 m\\
+Physical constraints & Regions, hard collisions and door capacity enabled\\
+Force/behavior mode & Manuscript forces; local behavioral actions\\
+Local avoidance & Enabled\\
+Manager parameters & $\kappa=12$, $\lambda=8$ m, $R_c=12$ m, $\tau_M=60$ s\\
+Responsiveness/floor coverage & $\gamma_i=1$; at least one manager per floor\\
+\bottomrule
+\end{tabular}
+\end{center}
+Speed and reaction parameters describe the distributions before clipping,
+rather than the exact moments after clipping. The normal GUI world has a longer
+default time limit, but the reproduction used 120 seconds. All compared runs
+finished before this bound, so it did not censor the results.
+
+The automatic coverage initializer selected the following six sites:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Section & Site 1 & Site 2\\
+\midrule
+Orchestra & \code{aisle:orchestra:2:0} & \code{aisle:orchestra:4:1}\\
+Loge & \code{aisle:loge:1:0} & \code{aisle:loge:4:0}\\
+Balcony & \code{aisle:balcony:2:0} & \code{aisle:balcony:4:0}\\
+\bottomrule
+\end{tabular}
+\end{center}
+These positions depend on all generated seats, not random occupancy. They are
+coverage-initialized positions, not the result of the genetic search.
+
+\section{Initial numerical results}
+All tables in this section are historical results from the original
+strongest-signal selection policy. The assigned-manager-priority revision
+changes manager choice when communication regions overlap; the previous
+timings and selected placements are not estimates of its current performance.
+\subsection{Metrics and experimental protocols}
+For completed exit times $t_{(1)}\leq\cdots\leq t_{(n)}$, define
+\[
+ T_{100}=t_{(n)},\qquad T_{95}=t_{(\lceil0.95n\rceil)},\qquad
+ \overline T=\frac1n\sum_{i=1}^{n}t_i.
+\]
+At $n=300$, $T_{95}$ is the 285th exit time. Let
+$\Delta T=T_{100}^{\mathrm{guided}}-T_{100}^{\mathrm{baseline}}$; negative
+values indicate faster clearance. Percentage change is
+$100\Delta T/T_{100}^{\mathrm{baseline}}$.
+
+Ordinary and counter-keyed paired randomness are different experimental
+protocols and should not be pooled as replications of one treatment. With the
+ordinary stream, changed route/option sets can shift subsequent random draws
+despite identical initialization seeds. The paired protocol controls that
+source of variation while permitting crowd interactions and queues to evolve
+differently because of managers.
+
+\subsection{Ordinary GUI configuration: seed 2026}
+The headless engine reproduction of the ordinary GUI configuration gave:
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Mode & $T_{100}$ (s) & $T_{95}$ (s) & $\overline T$ (s)\\
+\midrule
+Managers off & 60.443 & 48.149 & 29.409\\
+Six managers on & 58.742 & 48.164 & 29.218\\
+\bottomrule
+\end{tabular}
+\end{center}
+Total clearance decreased by 1.701 seconds (2.815\%), but $T_{95}$ was almost
+unchanged and slightly larger with managers. This realization therefore does
+not demonstrate a uniform improvement across all metrics.
+
+The guided run recorded 2,763 decisions with a positive instruction bonus.
+Subtracting only that bonus while retaining the same offered actions changed
+the winning action in 137 decisions. A total of 299 guests had different exit
+times. Both runs ended with guest 267, seat \code{B-07-2-5}, crossing
+\code{M4}; that guest had no recorded local choice reversal attributable to
+the bonus. Exit-time differences can include interaction effects and ordinary
+random-stream changes; they are not all direct manager-induced choice reversals.
+
+The GUI tick clock rounds to tenths of a second and advances to the end of a
+tick. Its precise clearance display uses the interpolated final crossing time.
+These are different measurements.
+
+\subsection{Paired initial-placement comparisons: seed 2026}
+With counter-keyed paired randomness and the same automatic placement:
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Mode & $T_{100}$ (s) & $T_{95}$ (s) & $\overline T$ (s)\\
+\midrule
+No managers; all exits open & 58.638 & 47.666 & 28.930\\
+Six managers; all exits open & 58.188 & 46.217 & 28.692\\
+Six managers; delayed blockage news & 79.699 & 66.238 & 34.327\\
+\bottomrule
+\end{tabular}
+\end{center}
+The open-exit manager benefit was 0.450 seconds, approximately 0.767\% of
+baseline clearance. In the blockage case, \code{SIDE_E1} closed at 10 s and
+automatic staff news was scheduled at 25 s. The guided blocked run was 21.511
+seconds slower than the guided open run. This difference combines capacity
+loss, rerouting and information effects; it does not isolate news delay alone.
+
+All three runs evacuated 300 guests. The paired open baseline sent 133 guests
+through the five-door \code{MAIN} bank, whereas the guided run sent 48 there.
+A small change in total clearance can therefore coexist with substantial
+redistribution of exit use.
+
+\subsection{Open-exit placement search}
+The first search used three initial layouts, one evolutionary generation,
+training seed 2026 and held-out seed 7. Five distinct layouts were evaluated
+in training. The selected positions were
+\begin{center}
+\begin{tabular}{ll}
+\code{aisle:loge:0:0} & \code{aisle:loge:1:1}\\
+\code{aisle:orchestra:0:0} & \code{balcony-rim:0:0}\\
+\code{corridor:1:1} & \code{foyer:0:0}
+\end{tabular}
+\end{center}
+Its training clearance was 54.749 seconds, versus 58.188 seconds for automatic
+coverage on the same training audience. The best member of the initial search
+population cleared in 54.921 seconds; the evolutionary generation improved
+that value to 54.749 seconds. These are training comparisons.
+
+On held-out seed 7, baseline clearance was 56.900 seconds and selected-layout
+clearance was 56.647 seconds: a 0.253-second reduction (0.445\%). The
+corresponding $T_{95}$ values were 46.957 and 46.449 seconds. The held-out
+benefit was considerably smaller than the apparent training gain.
+
+\subsection{Three-scenario layout screening}
+A separate trial compared two initial layouts with zero evolutionary
+generations. This was a small layout screening, not a deep optimization run.
+Training seed 2026 and three equal-weight scenarios were used: all exits open,
+\code{SIDE_E1} closing at 10 s with immediate staff news, and the same closure
+with staff news delayed by 15 s. The selected layout was
+\begin{center}
+\begin{tabular}{ll}
+\code{aisle:loge:0:0} & \code{aisle:loge:1:1}\\
+\code{aisle:orchestra:0:0} & \code{aisle:orchestra:5:1}\\
+\code{balcony-rim:0:0} & \code{corridor:1:1}
+\end{tabular}
+\end{center}
+Its training clearances were 54.921, 77.165 and 79.059 seconds, respectively,
+with mean 70.382 seconds. Automatic coverage had mean 72.529 seconds across
+these scenarios. All training runs completed.
+
+On held-out seed 7, the selected layout produced:
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+Scenario & Baseline (s) & Guided (s) & $\Delta T$ (s) & Change\\
+\midrule
+All open & 56.900 & 56.900 & 0.000 & 0.000\%\\
+Blocked; immediate news & 64.836 & 72.565 & $+7.730$ & $+11.922\%$\\
+Blocked; delayed news & 64.836 & 72.926 & $+8.090$ & $+12.478\%$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The two blocked no-manager results are identical because staff-notification
+timing cannot affect absent staff. All six held-out runs completed, but
+guidance was slower in the blocked cases. This layout did not establish a
+reliable held-out benefit under obstruction.
+
+In the all-open held-out case, $T_{100}$ was identical while $T_{95}$ changed
+from 46.957 to 47.820 seconds. This is an observed example of equal final
+clearance despite a changed evacuation process. In general,
+\[
+ \max_i t_i^{(0)}=\max_i t_i^{(1)}
+ \quad\not\Rightarrow\quad t_i^{(0)}=t_i^{(1)}\text{ for all }i.
+\]
+
+\subsection{Interpretation and limits of the results}
+The implementation transmits directions, changes utility maximizers,
+redistributes exits and respects physical closures. It also permits managers
+to slow evacuation: shortest walking distance omits downstream congestion,
+and staff occupy physical space. The observed slowdowns are compatible with
+these mechanisms, but the saved summaries do not isolate a single causal
+explanation for every case.
+
+Only one training audience and one held-out audience were used in each small
+search. No confidence intervals are available. These experiments do not
+establish optimal placement, generally beneficial authority strength, or a
+reliable percentage improvement. More audience seeds, wider placement search
+and separate parameter sensitivity are needed. Congestion-aware directions
+would be a different routing policy to compare with shortest-distance guidance.
+
+\subsection{Result provenance and implementation verification}
+The write-up reads saved artifacts and introduces no new simulations.
+Ordinary-policy results and local decision diagnostics come from
+\path{results/crowd-gui-timing-investigation.json}. Paired initial-layout
+results are in \path{results/crowd-mode-verification.json}, with per-person
+exit data in the corresponding \code{crowd-check-*-300.json} files.
+Open search results are in \path{results/crowd-search-smoke-300.json}; the
+three-scenario screening is in \path{results/crowd-scenario-smoke-300.json}.
+Reusable selected-layout files are saved beside those reports. Settings are
+in \path{crowd_manager_settings.json}, \path{crowd_manager_scenarios.json}
+and \path{bailey_motion/default_policy_settings.json}.
+
+Final verification records 25 focused headless tests and one real hidden-Tk
+test, all passing, with 300 audience members in every real engine. An exact
+pre/post baseline snapshot comparison passed. Checks also covered first-floor
+exterior crossings, no passage through the scheduled closed threshold after
+closure, matched initialization and finite exports. These verify implementation
+behavior, not empirical human response. See
+\path{results/crowd-final-verification.json}.
+
+\section{Research provenance and limits}
+The simulation--genetic-search architecture adapts von Schantz and Ehtamo,
+\href{https://doi.org/10.1016/j.physa.2022.127011}{Physica A 594 (2022), 127011}.
+Their moving-guide rules are not imported as stationary-manager behavior.
+Clustering/distance-dependent allocation in Yang et al.,
+\href{https://doi.org/10.1016/j.amc.2019.124711}{Applied Mathematics and Computation 365 (2020), 124711},
+motivates the coverage initializer and distance sensitivity. The coverage
+initializer itself is our chosen adaptation.
+
+Chu et al., \href{https://doi.org/10.1016/j.trc.2017.10.009}{Transportation Research C 85 (2017), 664--683},
+motivates explicit compliance and changing route information; this implementation
+does not copy its fitted logistic model. CellEVAC,
+\href{https://doi.org/10.1016/j.ssci.2021.105215}{Safety Science 139 (2021), 105215},
+provides a related decision/movement and simulation-optimization architecture.
+NIST \href{https://doi.org/10.6028/NIST.TN.1822}{TN 1822} motivates separate
+checks of navigation, exit usage, route availability, flow and uncertainty.
+
+The proximity/memory functions, stationary communication model, six-staff
+constraint and parameter values are explicit project hypotheses. Experiments
+on this schematic geometry cannot establish deployment suitability for an
+as-built venue. More training/validation audiences, parameter sensitivity and
+measured geometry are needed before interpreting a placement as robust.
+\end{document}

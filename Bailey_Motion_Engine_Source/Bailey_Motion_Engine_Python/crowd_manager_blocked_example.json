@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "count": 6,
+  "positions": [],
+  "strength": 12.0,
+  "decayLength": 8.0,
+  "communicationRange": 12.0,
+  "memorySeconds": 60.0,
+  "managerRadius": 0.2025,
+  "requireBothFloors": true,
+  "showCoverage": false,
+  "closures": [
+    {"portalId": "SIDE_E1", "at": 10.0, "notifyAfter": 15.0}
+  ]
+}

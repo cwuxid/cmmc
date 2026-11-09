@@ -1,0 +1,69 @@
+{
+  "engine": [
+    {
+      "name": "Exact normal-weight sampling, negative values retained",
+      "passed": true
+    },
+    {
+      "name": "Seeded simulations reproduce full outcomes",
+      "passed": true
+    },
+    {
+      "name": "Zero participants finishes at time zero",
+      "passed": true
+    },
+    {
+      "name": "Default 150-person experiment clears with four exits",
+      "passed": true
+    },
+    {
+      "name": "Simultaneous movement preserves exclusion, speed, and exit capacity",
+      "passed": true
+    },
+    {
+      "name": "Congestion, distance, and behavioral features follow utility definition",
+      "passed": true
+    },
+    {
+      "name": "Observations retain old target commitments during decision updates",
+      "passed": true
+    },
+    {
+      "name": "Rectangular obstacles block cells and allow navigation around them",
+      "passed": true
+    },
+    {
+      "name": "Custom exit placement and multi-cell exit widths work",
+      "passed": true
+    },
+    {
+      "name": "Max-step termination reports incomplete run honestly",
+      "passed": true
+    },
+    {
+      "name": "Input validation rejects invalid or impossible configurations",
+      "passed": true
+    },
+    {
+      "name": "Normal sampler supports zero variance exactly",
+      "passed": true
+    }
+  ],
+  "interface": {
+    "passed": 5,
+    "total": 5,
+    "environment": "Chrome headless, local files",
+    "checks": [
+      "Initial render and step",
+      "Run and pause",
+      "Invalid input preserves current experiment",
+      "JSON configuration and completion",
+      "Malformed JSON reports error"
+    ]
+  },
+  "notes": [
+    "Engine tests also ran under the tool's V8 JavaScript runtime.",
+    "CLI was syntax-checked but not executed under Node.js; Node.js was unavailable.",
+    "preview.png is the initial simulator interface screenshot."
+  ]
+}

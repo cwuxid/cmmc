@@ -1,0 +1,273 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,array}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\ind}{\mathbf{1}}
+\title{LED Route Guidance: Mathematical Model and Code Implementation}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\section{Purpose and interpretation}
+The optional LED mode represents directional illuminated strips along the
+building's modeled walking network. The strips indicate a shortest-distance
+route to an eligible first-floor exterior threshold. People retain the ordinary
+behavioral utility model: lighting encourages a direction without replacing
+individual preferences by the deterministic student policy.
+
+The implemented influence is a \emph{constant utility bonus}, measured on the
+same scale as crowd-manager authority. It is not an acceleration, mechanical
+force, or inverse-square attraction. In the existing manager model the
+received authority decreases exponentially with manager--guest separation;
+LED authority has no such spatial attenuation or memory-decay multiplier.
+
+Continuous strip coverage along the modeled walking network is assumed. The
+current model has no separate optical intensity, smoke attenuation, strip
+visibility radius, electrical failure, or distance-to-strip detection model.
+These are explicit scope assumptions, rather than measured lighting properties.
+
+\section{Shared shortest-route controller}
+Use the existing directed graph $G=(V,E)$ with nonnegative edge lengths
+$L_e$ in metres. Vertices represent row/aisle attachments, circulation
+connections, portal departures and named destination entrances. Stair/access
+edges use declared traversal lengths. Rectangular and annular regions use the
+same geometric distance rules as crowd-manager recommendations and student
+routing. Routes respect floor and region connectivity; the elevator is excluded.
+
+Let $B_L(t)$ be the set of portal IDs unavailable to the LED controller.
+For a graph state $v$, define
+\[
+ D_{B_L(t)}(v)=\min_{\pi:v\leadsto V_{\mathrm{exit}}(B_L(t))}
+                                  \sum_{e\in\pi}L_e.
+\]
+Known unavailable transfer edges and final-threshold seeds are excluded.
+The reverse multi-source Dijkstra implementation caches fields for repeated
+availability states. Unreachable states have no recommended route.
+
+For a person $i$ at its current position and region, let
+$\mathcal A_i^{\mathrm{phys}}(t)$ be the physically permitted local next-target
+actions. The controller evaluates
+\[
+ Q_i^L(a,t)=L_i(a,t)+D_{B_L(t)}(v_a),\qquad
+ \widehat a_i^L(t)\in\arg\min_{a\in\mathcal A_i^{\mathrm{phys}}(t)}Q_i^L(a,t).
+\]
+$L_i(a,t)$ includes distance to and through the proposed first action; for a
+portal it includes the actual transfer before downstream distance is added.
+Stable exit-ID and action-ID ordering breaks equal-distance ties.
+
+Although the instruction is evaluated at a person's position, the controller
+uses one common availability state. The implementation deliberately computes
+this recommendation without the person's private blocked-portal list. Private
+knowledge cannot redraw a physical strip field differently for each guest.
+
+\section{Information supplied to the person}
+The LED network indicates a next local target. If that action is physically
+available and its indicated portal sequence contains no closure already known
+to the person, it is accepted as an LED instruction. A stale instruction known
+to be blocked is ignored; the person can continue with ordinary behavioral
+choices instead.
+
+An indicated target is added to the offered action set even if the destination
+itself is not visible. The modeling interpretation is following local strips
+around a bend, not seeing through a wall. The implementation records the
+target location as known. It does not give the person the entire building's
+target inventory as student mode does. The full recommended sequence is kept
+in diagnostic data, while the behavioral policy uses the next-action cue.
+
+No additional strip memory-strength law is applied. At each normal decision
+the person receives the current local cue. The chosen target remains committed
+between decisions under the existing scheduler. The default three-second
+decision interval and immediate reconsideration on relevant stage changes or
+local closure discovery remain in place.
+
+\section{Constant behavioral influence}
+Let $U_i^0(a,t)$ be the current ordinary utility before guidance. Its behavioral
+component remains
+\[
+ B_i(a,t)=-w_{Ti}T_i(a,t)+w_{Pi}P_i(a,t)
+                         -w_{Ni}N_i(a,t)-w_{Si}C_i(a,t).
+\]
+The full default utility also retains its local-distance reward, panic term
+and residual shock. No familiarity weight is restored and no new person-level
+weight is sampled for LEDs.
+
+For adjustable magnitude $\kappa_L\geq0$, the LED contribution is
+\[
+ \boxed{\displaystyle
+ G_i^L(a,t)=\kappa_L\,
+      \ind\{\text{valid LED instruction exists}\}
+      \ind\{a=\widehat a_i^L(t)\}.}
+\]
+Thus the indicated action receives exactly $\kappa_L$ utility units and all
+other actions receive zero LED bonus. There is no factor $1/d$, $1/d^2$,
+$e^{-d/\lambda}$ or age attenuation in this contribution.
+
+With optional manager authority $G_i^M(a,t)$, choice becomes
+\[
+ a_i^*(t)\in\arg\max_{a\in\mathcal A_i^{\mathrm{offered}}(t)}
+       \bigl[U_i^0(a,t)+G_i^M(a,t)+G_i^L(a,t)\bigr].
+\]
+Manager and LED bonuses add when both nonstudent modes are enabled. Their
+directions may agree or differ because managers and lighting can have different
+closure knowledge. Existing assigned-manager priority is unchanged.
+
+For an alternative $b\ne\widehat a_i^L$, lighting changes the utility difference
+by $\kappa_L$. The person prefers the indicated direction precisely when
+\[
+ U_i^0(\widehat a_i^L,t)-U_i^0(b,t)
+ +G_i^M(\widehat a_i^L,t)-G_i^M(b,t)+\kappa_L\geq0,
+\]
+subject to the policy's tie handling. A finite bonus can be outweighed by
+behavioral preferences or perceived queue costs; compliance is not guaranteed.
+Under \code{behavioralOnly=true}, the distance/panic/residual terms are removed
+as before, while the behavioral dot product and enabled guidance bonuses remain.
+
+The default is $\kappa_L=12$, matching the default manager's limiting bonus
+at zero separation and immediately after receipt. For comparison, the manager
+model uses a received factor approximately
+\[
+ G_i^M(a,t)=\kappa_M\gamma_i e^{-d_{im}/\lambda_M}
+            e^{-(t-t_r)/\tau_M}\ind\{a=\widehat a_i^M\},
+\]
+when its floor/range/occlusion and instruction-validity conditions hold.
+The numerical match uses the default $\kappa_M=12$ and $\gamma_i=1$;
+changing manager strength does not automatically change LED strength.
+
+Setting $\kappa_L=0$ removes both instruction-based target discovery and the
+LED bonus. Displayed strip geometry may remain visible in the GUI, but agents
+ignore it. This provides a behavioral zero-strength control.
+
+\section{Adaptive and static lighting}
+With \code{adaptive=true}, at each simulation tick the controller uses
+\[
+ B_L(t)=\{p:\ p\text{ is evacuation-allowed and currently disabled}\}.
+\]
+Scheduled physical closures are applied before this update. A changed set
+invalidates the displayed-network cache and selects the corresponding route
+field. This assumes instantaneous portal-availability information for the
+lighting controller; no sensor or transmission delay is simulated.
+
+The person receives a changed direction at its next decision. The controller
+does not insert every remotely closed portal into the person's knowledge.
+Guests retain their ordinary local closure discovery. Physical gates always
+prevent passage through a disabled threshold, independent of lighting.
+
+With \code{adaptive=false}, the controller freezes the availability state
+captured when the LED option is initialized. Later closures can make the
+displayed directions stale. A person who knows that the indicated route is
+blocked rejects that cue rather than silently changing the shared strip field.
+
+\section{Physical movement and mode precedence}
+LED guidance changes action utilities and next-target information only.
+Preferred speeds, reaction delays, social forces, collision avoidance, doorway
+service capacities, stair queues and the exterior-threshold completion rule
+are retained. There is no new term in the social-force acceleration equation.
+The reference graph minimizes distance rather than crowd-dependent travel
+time, so lighting does not guarantee the fastest evacuation.
+
+Student mode takes precedence: with \code{studentMode=true}, no LED guidance
+object, agent LED records, strip display or bonus is active. The LED checkbox
+and strength control are disabled while their preferences are retained for a
+later nonstudent reset. Students already use their own direct shortest-distance
+selection rule and have no active crowd managers.
+
+For nonstudents, LEDs may be used alone or with explicitly enabled managers.
+Enabling lighting does not automatically create staff. The ordinary default
+world remains unchanged when LED mode is absent or disabled.
+
+\section{Configuration and controls}
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+World key under \code{ledStrips} & Default & Units & Effect\\
+\midrule
+\code{enabled} & false & Boolean & Activate the optional mode\\
+\code{strength} & 12 & Utility & Constant nonnegative bonus\\
+\code{adaptive} & true & Boolean & Update controller availability\\
+\code{showStrips} & true & Boolean & Draw the reference strip network\\
+\bottomrule
+\end{tabular}
+\end{center}
+The separate \code{led_settings.json} example sets \code{enabled=true}.
+Strength must be finite and nonnegative. \code{showStrips=false} hides the
+visualization without changing agent behavior.
+
+In the GUI, enable \emph{LED route strips (apply/reset)}, set
+\emph{LED strength (utility bonus)}, and select \emph{Reset / apply controls}.
+Strength is applied on reset rather than changed silently during a run.
+The GUI spinner offers 0--100 for convenience; the model validator does not
+impose an upper bound on a manually supplied finite nonnegative strength.
+\begin{verbatim}
+python run.py --n 300 --led-strips --led-strength 12 --gui
+python run.py --n 300 --led-settings led_settings.json
+python run.py --n 300 --led-strips --led-strength 6
+python run.py --n 300 --led-settings led_settings.json --no-led-strips
+\end{verbatim}
+\code{--led-strength} changes the parameter but does not enable the option
+by itself. Student precedence also applies to CLI and world-JSON runs.
+
+\section{Code organization and update sequence}
+\begin{longtable}{p{.30\textwidth}p{.64\textwidth}}
+\toprule
+File & Responsibility\\
+\midrule
+\endhead
+\code{led_guidance.py} & Validates settings; owns controller availability,
+instructions, constant bonuses, reference paths and LED summaries.\\
+\code{crowd_routes.py} & Shared distance graph, local-action attachment,
+shortest-route recommendations and knowledge-keyed route cache.\\
+\code{engine.py} & Activates LEDs only in enabled nonstudent runs; updates
+the controller after scheduled closures and before decisions; exports state.\\
+\code{behavior.py} & Offers the indicated target, applies the LED bonus to
+ordinary utility and records selected/counterfactual choices.\\
+\code{plan_viewer.py} & Renders green directed strips on the correct floor,
+using a revision-dependent visualization cache.\\
+\code{app.py} & GUI toggle, strength control, student-mode disabling and
+active-mode diagnostics.\\
+\code{cli.py}, \code{config.py} & Command-line overrides and validation.\\
+\code{led_settings.json} & Separate opt-in settings example.\\
+\bottomrule
+\end{longtable}
+
+Within \code{LEDGuidance}, \code{before_tick()} updates availability;
+\code{instruction()} obtains a valid shared-field direction;
+\code{bonus()} returns the constant contribution; and \code{display_paths()}
+constructs cached reference strips. At each policy decision,
+\code{LocalBehavior.perceived_actions()} adds the cue's target and
+\code{LocalBehavior.choose()} evaluates the augmented utilities. The normal
+movement engine then advances the chosen action.
+
+\section{Strip visualization and diagnostics}
+The display combines shortest graph continuations, reachable radial aisles,
+and curved row branches leading to their chosen aisle. Row branches include
+the graph's row-to-aisle-centre attachment. Annular routes use straight
+segments where valid and tangent/arc paths around the inner disk otherwise.
+Arcs are tessellated for drawing, with approximately 0.6-metre maximum arc
+sampling spacing. There are no planar lines joining different floors through
+stairs. If no exterior route is reachable, the controller displays no
+shortest-route strip network.
+
+This is a schematic reference network, not a traced electrical installation.
+Actual force-driven trajectories can deviate from its centre paths. Rendering
+does not advance the simulation, consume audience RNG draws or alter decisions.
+
+Agent state under \code{data.led} records the current instruction and counts of
+recommended, followed and bonus-changed decisions. Each scored alternative
+has \code{ledBonus}. The decision also records \code{ledStrength},
+\code{choiceWithoutLEDBonus} and \code{ledChangedChoice}. The latter compares
+the actual choice with scoring the \emph{same offered actions} after subtracting
+only the LED bonus, retaining all other terms, shocks and manager contributions.
+It is a local diagnostic, not a full no-lighting causal counterfactual, because
+the lighting may also have revealed a target.
+
+Summary exports identify the influence as a constant utility bonus and include
+strength, adaptive state, controller closures and adherence counts. Adherence
+includes single-action stages and is not an empirically estimated obedience
+probability. The mathematical and implementation checks do not calibrate the
+default magnitude to observed evacuation behavior. No numerical results are
+reported in this write-up.
+\end{document}

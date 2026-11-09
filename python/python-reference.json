@@ -1,0 +1,100 @@
+{
+  "source": "JavaScript model.js; default seed 42. Python parity-test fixture, not evidence of Python execution.",
+  "defaultSummary": {
+    "status": "complete",
+    "participants": 150,
+    "exited": 150,
+    "remaining": 0,
+    "elapsedSteps": 933,
+    "clearanceTime": 933,
+    "meanExitTimeAmongExited": 176.38666666666666,
+    "p95ExitTimeAmongExited": 747,
+    "meanWaitingStepsAllParticipants": 152.74666666666667,
+    "switches": 194,
+    "conflicts": 242,
+    "frictionEvents": 9,
+    "exitCounts": {
+      "North": 12,
+      "East": 52,
+      "South": 46,
+      "West": 40
+    }
+  },
+  "firstAgents": [
+    {
+      "id": 0,
+      "initialCell": 60,
+      "weights": {
+        "time": 1.2621490193424183,
+        "habit": 2.5984863230798347,
+        "peer": 0.08845727764326561,
+        "norm": -0.9741242726734545,
+        "switching": 0.22292412338885514
+      },
+      "betaDistance": 0.37237387418281287,
+      "betaCongestion": -0.2960142435040325,
+      "panicSusceptibility": 0.3016130650648847,
+      "entranceExit": 3
+    },
+    {
+      "id": 1,
+      "initialCell": 194,
+      "weights": {
+        "time": 0.8871686128855916,
+        "habit": 1.3423232504860174,
+        "peer": -0.10757436206398852,
+        "norm": 0.3653343408934863,
+        "switching": 2.605634718815121
+      },
+      "betaDistance": 0.8466138265794143,
+      "betaCongestion": -0.9530662128236145,
+      "panicSusceptibility": 0.30876816587988287,
+      "entranceExit": 0
+    },
+    {
+      "id": 2,
+      "initialCell": 490,
+      "weights": {
+        "time": 0.5896453866775321,
+        "habit": 0.9963176285783345,
+        "peer": -0.5364208709253007,
+        "norm": 1.6081888035354972,
+        "switching": 1.0336709691905996
+      },
+      "betaDistance": 0.7387398103019223,
+      "betaCongestion": 0.8283676987048239,
+      "panicSusceptibility": 0.6058370234677568,
+      "entranceExit": 2
+    },
+    {
+      "id": 3,
+      "initialCell": 84,
+      "weights": {
+        "time": 0.8112632490525538,
+        "habit": -0.013561406659478137,
+        "peer": 0.5927835376345488,
+        "norm": 1.531385134759016,
+        "switching": 0.6612108069948708
+      },
+      "betaDistance": 0.5335835964651778,
+      "betaCongestion": -0.5360075270291418,
+      "panicSusceptibility": 0.7473694247892126,
+      "entranceExit": 2
+    },
+    {
+      "id": 4,
+      "initialCell": 266,
+      "weights": {
+        "time": -0.10779386224351162,
+        "habit": 1.0411705162123313,
+        "peer": 1.0790808160355028,
+        "norm": 0.7432645352211068,
+        "switching": -0.5196581793907555
+      },
+      "betaDistance": 0.8980352835496888,
+      "betaCongestion": -0.22957432200200856,
+      "panicSusceptibility": 0.6439874990610406,
+      "entranceExit": 2
+    }
+  ]
+}

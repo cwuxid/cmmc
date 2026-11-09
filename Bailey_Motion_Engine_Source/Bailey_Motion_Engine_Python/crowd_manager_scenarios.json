@@ -1,0 +1,9 @@
+[
+  {"name": "open", "weight": 1, "closures": []},
+  {"name": "blocked-known", "weight": 1, "closures": [
+    {"portalId": "SIDE_E1", "at": 10, "notifyAfter": 0}
+  ]},
+  {"name": "blocked-delayed", "weight": 1, "closures": [
+    {"portalId": "SIDE_E1", "at": 10, "notifyAfter": 15}
+  ]}
+]

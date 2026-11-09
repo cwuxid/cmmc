@@ -1,0 +1,148 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\title{Student Audience Option: Mathematical Summary}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\section{Modeling assumption}
+The optional student mode represents an audience familiar with the building's
+permitted evacuation paths. When enabled, every participant chooses a route
+that minimizes remaining travel distance in the model's navigation graph.
+This is an explicit behavioral assumption for the experiment. The option is
+disabled by default, leaving the existing behavioral model in place.
+
+Let the audience be indexed by $i\in\{1,\ldots,n\}$. Each student retains an
+initial seat $s_i$, position $\mathbf x_i(t)$, floor, region, preferred speed,
+reaction delay and body radius. Familiarity supplies knowledge of the building
+layout; it does not change these physical characteristics.
+
+\section{Distance representation and initial seat mapping}
+Use the existing directed navigation graph
+\[
+ G=(V,E),\qquad L_e\geq0\quad(e\in E),
+\]
+whose vertices represent aisle ends, circulation connections, portal departures
+and named destination entrances. Edge lengths are measured in metres.
+Rows connect through their permitted aisle ends; stairs and access connectors
+use their declared traversal lengths. Circulation distances follow the
+schematic rectangular or curved region geometry.
+
+Every seat receives an initial shortest route to a permitted exterior
+threshold. The graph preserves floor and region connectivity, so a short
+straight line through a wall, seating block or floor is not an admissible
+route. The elevator remains excluded. These are distances in the implemented
+schematic graph, rather than surveyed three-dimensional building distances.
+
+\section{Student route-choice rule}
+Let $B_i(t)$ be the set of closures known to student $i$. Remove the associated
+transfer edges and exterior-threshold destinations from the route search.
+For a graph state $v$, define
+\[
+ D_{B_i(t)}(v)=
+ \min_{\pi:v\leadsto V_{\mathrm{exit}}(B_i(t))}
+                         \sum_{e\in\pi}L_e,
+\]
+where $V_{\mathrm{exit}}(B_i(t))$ contains the exterior thresholds not known
+to be closed. Set this distance to infinity if no admissible route exists.
+The implementation evaluates these distances using reverse multi-source
+Dijkstra search and caches fields for repeated closure-knowledge states.
+
+At a decision time, let $\mathcal A_i^{\mathrm{phys}}(t)$ contain the student's
+physically permitted next-target actions. For action $a$, let $L_i(a,t)$ be
+the distance to and through that action, and $v_a$ its downstream graph state.
+A portal action includes its actual transfer before its continuation is scored.
+The remaining distance associated with the action is
+\[
+ Q_i(a,t)=L_i(a,t)+D_{B_i(t)}(v_a).
+\]
+The student selects
+\[
+ \boxed{\displaystyle
+ a_i^*(t)\in\arg\min_{a\in\mathcal A_i^{\mathrm{phys}}(t)}Q_i(a,t).}
+\]
+Unreachable actions are excluded. Equal distances use deterministic exit-ID
+and action-ID tie rules. If every continuation is unreachable, the student
+clears its current target and waits for reconsideration.
+
+The initial seat mapping provides a reference route. Subsequent decisions
+use the current position and knowledge, allowing the intended route to change
+after physical displacement or newly discovered closures. The existing default
+three-second decision interval is retained, with immediate reconsideration
+on relevant region transitions and local closure discovery.
+
+\section{Knowledge and unexpected obstructions}
+Students know target locations and connectivity, so familiar targets can be
+considered without the ordinary target-visibility filter. Physical eligibility
+still restricts available actions to the correct floor, region and connectors.
+
+Layout knowledge does not imply immediate knowledge of an unexpected blocked
+exit. The distance query uses $B_i(t)$ rather than all physically disabled
+portals. Students retain the existing visibility-based local discovery rule,
+with a default discovery radius of 2.2 metres. A student may therefore approach
+a closed door, discover its condition, and then choose the shortest remaining
+known route. Physical closure prevents passage even before discovery.
+
+The directed movement model defines which alternatives exist. If the current
+state has no permitted alternate continuation after a closure, the policy waits
+rather than inventing a reverse movement or an inter-floor shortcut.
+
+\section{Relationship to behavioral utility and physical movement}
+Student route selection minimizes distance directly. Behavioral weights,
+peer-following preference, norm penalties, target-switching penalties,
+perceived queue time and panic/residual utility shocks do not select the route.
+The existing four weights are still initialized for consistent audience
+construction, but are unused by the student route-choice rule. This option
+does not add a familiarity weight to the ordinary behavioral utility.
+
+After selecting a target, the student moves through the existing physical
+engine. In manuscript force mode the underlying acceleration includes
+\[
+ \frac{d\mathbf v_i}{dt}
+ =\frac{v_i^0\widehat{\mathbf e}_i-\mathbf v_i}{\tau}
+  +\mathbf f_i^{\mathrm{obs}}
+  +\sum_j\mathbf f_{ij}^{\mathrm{int}},
+\]
+where $\widehat{\mathbf e}_i$ points toward the legal waypoint for the selected
+action. Configured integration, local avoidance, collision exclusion, region
+constraints, door capacities and stair queues remain active. Consequently,
+shortest intended distance does not guarantee the shortest realized trajectory
+or the fastest evacuation through a congested building.
+
+\section{Precedence over crowd managers}
+When student mode is active,
+\[
+ \mathcal M_{\mathrm{active}}=\varnothing.
+\]
+No crowd-manager bodies, instructions, authority bonuses or notifications
+affect the audience, even if the manager option is selected. Explicit physical
+closure schedules remain applicable; staff-notification delays have no effect
+because there are no staff. The GUI disables the manager control while
+retaining its preference for use after student mode is switched off and the
+experiment is reset.
+The optional LED-strip mode is also suppressed: students receive no LED
+instruction or utility bonus and no strip network is displayed. Its controls
+retain their preferences for a later nonstudent reset. Student route choice
+continues to use its own direct distance-minimization rule.
+
+\section{Controls and implementation}
+Enable \emph{Students: shortest routes (apply/reset)} in the GUI and select
+\emph{Reset / apply controls}. The command-line equivalent is
+\begin{verbatim}
+python run.py --n 300 --students --gui
+\end{verbatim}
+World JSON can instead contain \code{"studentMode": true}.
+The \code{--no-students} flag restores ordinary behavioral route choice.
+
+\code{students.py} implements the student policy and reuses the graph in
+\code{crowd_routes.py}. Saved student decisions identify their selection mode,
+chosen action, intended exit and remaining route distances. Unreachable values
+are represented as nulls in JSON. These diagnostics make the assumed
+distance-minimizing behavior inspectable without changing physical movement.
+\end{document}

@@ -1,0 +1,55 @@
+{
+  "python": "3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]",
+  "testsRun": 17,
+  "passed": 16,
+  "failures": 0,
+  "errors": 0,
+  "skipped": [
+    {
+      "name": "test_tk_controls_and_completion (test_visualize.AnimationTests.test_tk_controls_and_completion)",
+      "reason": "A Tk display is unavailable: Can't find a usable init.tcl in the following directories: \n    {C:\\Users\\casey\\Desktop\\modeling\\.python-runtime\\tcl\\tcl8.6}\n\n\n\nThis probably means that Tcl wasn't installed properly.\n"
+    }
+  ],
+  "sampleRuns": [
+    {
+      "status": "complete",
+      "participants": 150,
+      "exited": 150,
+      "remaining": 0,
+      "elapsedSteps": 933,
+      "clearanceTime": 933,
+      "meanExitTimeAmongExited": 176.38666666666666,
+      "p95ExitTimeAmongExited": 747,
+      "meanWaitingStepsAllParticipants": 152.74666666666667,
+      "switches": 194,
+      "conflicts": 242,
+      "frictionEvents": 9,
+      "exitCounts": {
+        "North": 12,
+        "East": 52,
+        "South": 46,
+        "West": 40
+      }
+    },
+    {
+      "status": "complete",
+      "participants": 1000,
+      "exited": 1000,
+      "remaining": 0,
+      "elapsedSteps": 5655,
+      "clearanceTime": 5655,
+      "meanExitTimeAmongExited": 2167.804,
+      "p95ExitTimeAmongExited": 4746,
+      "meanWaitingStepsAllParticipants": 2094.912,
+      "switches": 33047,
+      "conflicts": 3589,
+      "frictionEvents": 158,
+      "exitCounts": {
+        "North": 397,
+        "East": 354,
+        "South": 190,
+        "West": 59
+      }
+    }
+  ]
+}

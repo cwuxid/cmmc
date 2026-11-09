@@ -1,0 +1,12 @@
+.browser-check/
+.local-tools/
+run*.json
+obstacle-run.json
+__pycache__/
+*.pyc
+python-run*.json
+python-agents*.csv
+.python-runtime/
+.python-runtime.zip
+Bailey_Motion_Engine_Source/Bailey_Motion_Engine_Python/results/*
+!Bailey_Motion_Engine_Source/Bailey_Motion_Engine_Python/results/.gitkeep

@@ -1,0 +1,1153 @@
+{
+  "seed": 2026,
+  "arrival": {
+    "defaultEntrance": "M2",
+    "routesBySeat": {}
+  },
+  "population": 300,
+  "dt": 0.1,
+  "playback": 10,
+  "limits": {
+    "maxSeconds": 1800,
+    "hardCollisions": true,
+    "enforceRegions": true,
+    "doorCapacity": true
+  },
+  "geometry": {
+    "visibilityWalls": [],
+    "centerY": 7.5,
+    "auditoriumR": 22.2,
+    "corridorR": 25.2,
+    "balconyR": 22.75,
+    "aisleHalfWidth": 1.3,
+    "aisleAngles": [
+      0.025,
+      0.215,
+      0.405,
+      0.595,
+      0.785,
+      0.975
+    ],
+    "auditoriumDoors": [
+      0.06,
+      0.17,
+      0.28,
+      0.39,
+      0.5,
+      0.61,
+      0.72,
+      0.83,
+      0.94
+    ],
+    "foyerDoors": [
+      0.44,
+      0.5,
+      0.56
+    ],
+    "exits": [
+      {
+        "id": "SIDE_E1",
+        "angle": 0.15,
+        "width": 1.35,
+        "type": "side"
+      },
+      {
+        "id": "SIDE_E2",
+        "angle": 0.34,
+        "width": 1.35,
+        "type": "side"
+      },
+      {
+        "id": "MAIN",
+        "angle": 0.5,
+        "width": 8.75,
+        "type": "main"
+      },
+      {
+        "id": "SIDE_W2",
+        "angle": 0.66,
+        "width": 1.35,
+        "type": "side"
+      },
+      {
+        "id": "SIDE_W1",
+        "angle": 0.85,
+        "width": 1.35,
+        "type": "side"
+      }
+    ],
+    "stairs": [
+      {
+        "id": "BACK_E",
+        "angle": 0.35,
+        "type": "foyer",
+        "width": 1.6,
+        "length": 15
+      },
+      {
+        "id": "BACK_W",
+        "angle": 0.65,
+        "type": "foyer",
+        "width": 1.6,
+        "length": 15
+      },
+      {
+        "id": "STAGE_E",
+        "angle": 0.025,
+        "type": "outside",
+        "width": 1.15,
+        "length": 12
+      },
+      {
+        "id": "STAGE_W",
+        "angle": 0.975,
+        "type": "outside",
+        "width": 1.15,
+        "length": 12
+      }
+    ],
+    "sections": [
+      {
+        "id": "orchestra",
+        "floor": 0,
+        "capacity": 527,
+        "firstR": 6.7,
+        "step": 0.64,
+        "rows": 16,
+        "pitch": 0.58
+      },
+      {
+        "id": "loge",
+        "floor": 0,
+        "capacity": 486,
+        "firstR": 17.5,
+        "step": 0.68,
+        "rows": 7,
+        "pitch": 0.6
+      },
+      {
+        "id": "balcony",
+        "floor": 1,
+        "capacity": 316,
+        "firstR": 16,
+        "step": 0.68,
+        "rows": 9,
+        "pitch": 0.67
+      }
+    ],
+    "layoutVersion": 2,
+    "geometryStatus": "Topology from supplied plans and description; metric dimensions remain schematic approximations.",
+    "completionRule": "first_floor_exterior_threshold",
+    "plans": [
+      {
+        "id": "main",
+        "floor": 0,
+        "name": "First floor: orchestra / loge / corridor / foyer"
+      },
+      {
+        "id": "balcony",
+        "floor": 1,
+        "name": "Second floor: balcony"
+      }
+    ],
+    "orchestraBarrier": {
+      "radius": 16.9,
+      "width": 0.35,
+      "accessWidth": 1.3,
+      "accessLength": 1.5,
+      "accessAngles": [
+        0.025,
+        0.215,
+        0.405,
+        0.595,
+        0.785,
+        0.975
+      ]
+    },
+    "zones": {
+      "orchestra": {
+        "floor": 0,
+        "minR": 6.3,
+        "maxR": 16.525,
+        "outerRegion": "access"
+      },
+      "loge": {
+        "floor": 0,
+        "minR": 17.3,
+        "maxR": 22.2,
+        "outerRegion": "rim"
+      },
+      "balcony": {
+        "floor": 1,
+        "minR": 15.7,
+        "maxR": 22.75,
+        "outerRegion": "balcony-rim"
+      }
+    },
+    "regions": {
+      "rim": {
+        "floor": 0,
+        "kind": "annulus",
+        "minR": 22.02,
+        "maxR": 24.05,
+        "trackR": 23.15,
+        "minAngle": 0.012,
+        "maxAngle": 0.988
+      },
+      "corridor": {
+        "floor": 0,
+        "kind": "annulus",
+        "minR": 24.0,
+        "maxR": 27.3,
+        "trackR": 25.5,
+        "minAngle": 0.005,
+        "maxAngle": 0.995
+      },
+      "balcony-rim": {
+        "floor": 1,
+        "kind": "annulus",
+        "minR": 22.57,
+        "maxR": 24.5,
+        "trackR": 23.15,
+        "minAngle": 0.008,
+        "maxAngle": 0.992
+      },
+      "foyer": {
+        "floor": 0,
+        "kind": "rectangle",
+        "minX": -12.4,
+        "maxX": 12.4,
+        "minY": 32.2,
+        "maxY": 41.2
+      },
+      "stage-east": {
+        "floor": 0,
+        "kind": "rectangle",
+        "minX": 21.5,
+        "maxX": 24.25,
+        "minY": 3.8,
+        "maxY": 6.8
+      },
+      "stage-west": {
+        "floor": 0,
+        "kind": "rectangle",
+        "minX": -24.25,
+        "maxX": -21.5,
+        "minY": 3.8,
+        "maxY": 6.8
+      }
+    },
+    "entrances": {
+      "LOGE_ACCESS_1": {
+        "id": "LOGE_ACCESS_1",
+        "plan": "main",
+        "floor": 0,
+        "region": "aisle",
+        "x": 17.366299953631092,
+        "y": 8.86675744757906,
+        "normal": {
+          "x": 0.996917333733128,
+          "y": 0.07845909572784494
+        },
+        "zone": "loge",
+        "aisleAngle": 0.07853981633974483
+      },
+      "LOGE_ACCESS_2": {
+        "id": "LOGE_ACCESS_2",
+        "plan": "main",
+        "floor": 0,
+        "region": "aisle",
+        "x": 13.595097695833706,
+        "y": 18.39172707336798,
+        "normal": {
+          "x": 0.7804304073383298,
+          "y": 0.6252426563357051
+        },
+        "zone": "loge",
+        "aisleAngle": 0.6754424205218055
+      },
+      "LOGE_ACCESS_3": {
+        "id": "LOGE_ACCESS_3",
+        "plan": "main",
+        "floor": 0,
+        "region": "aisle",
+        "x": 5.122182465546734,
+        "y": 24.149914317786912,
+        "normal": {
+          "x": 0.2940403252323039,
+          "y": 0.9557930147983301
+        },
+        "zone": "loge",
+        "aisleAngle": 1.2723450247038663
+      },
+      "LOGE_ACCESS_4": {
+        "id": "LOGE_ACCESS_4",
+        "plan": "main",
+        "floor": 0,
+        "region": "aisle",
+        "x": -5.122182465546732,
+        "y": 24.149914317786916,
+        "normal": {
+          "x": -0.2940403252323038,
+          "y": 0.9557930147983302
+        },
+        "zone": "loge",
+        "aisleAngle": 1.8692476288859268
+      },
+      "LOGE_ACCESS_5": {
+        "id": "LOGE_ACCESS_5",
+        "plan": "main",
+        "floor": 0,
+        "region": "aisle",
+        "x": -13.595097695833706,
+        "y": 18.39172707336798,
+        "normal": {
+          "x": -0.7804304073383298,
+          "y": 0.6252426563357051
+        },
+        "zone": "loge",
+        "aisleAngle": 2.466150233067988
+      },
+      "LOGE_ACCESS_6": {
+        "id": "LOGE_ACCESS_6",
+        "plan": "main",
+        "floor": 0,
+        "region": "aisle",
+        "x": -17.366299953631092,
+        "y": 8.866757447579062,
+        "normal": {
+          "x": -0.996917333733128,
+          "y": 0.07845909572784507
+        },
+        "zone": "loge",
+        "aisleAngle": 3.0630528372500483
+      },
+      "CORRIDOR_AUD0": {
+        "id": "CORRIDOR_AUD0",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": 24.223203602969463,
+        "y": 12.120823217683968,
+        "normal": {
+          "x": 0.9822872507286887,
+          "y": 0.1873813145857246
+        }
+      },
+      "CORRIDOR_AUD1": {
+        "id": "CORRIDOR_AUD1",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": 21.22589838591725,
+        "y": 20.052961312404157,
+        "normal": {
+          "x": 0.8607420270039436,
+          "y": 0.5090414157503713
+        }
+      },
+      "CORRIDOR_AUD2": {
+        "id": "CORRIDOR_AUD2",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": 15.718875587202687,
+        "y": 26.500856566850963,
+        "normal": {
+          "x": 0.6374239897486896,
+          "y": 0.7705132427757893
+        }
+      },
+      "CORRIDOR_AUD3": {
+        "id": "CORRIDOR_AUD3",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": 8.353277113248888,
+        "y": 30.7021197624112,
+        "normal": {
+          "x": 0.3387379202452915,
+          "y": 0.9408807689542255
+        }
+      },
+      "CORRIDOR_AUD4": {
+        "id": "CORRIDOR_AUD4",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": 1.5099895033486865e-15,
+        "y": 32.16,
+        "normal": {
+          "x": 6.123233995736766e-17,
+          "y": 1.0
+        }
+      },
+      "CORRIDOR_AUD5": {
+        "id": "CORRIDOR_AUD5",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": -8.353277113248884,
+        "y": 30.7021197624112,
+        "normal": {
+          "x": -0.33873792024529137,
+          "y": 0.9408807689542255
+        }
+      },
+      "CORRIDOR_AUD6": {
+        "id": "CORRIDOR_AUD6",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": -15.718875587202689,
+        "y": 26.500856566850963,
+        "normal": {
+          "x": -0.6374239897486897,
+          "y": 0.7705132427757893
+        }
+      },
+      "CORRIDOR_AUD7": {
+        "id": "CORRIDOR_AUD7",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": -21.225898385917247,
+        "y": 20.052961312404157,
+        "normal": {
+          "x": -0.8607420270039435,
+          "y": 0.5090414157503714
+        }
+      },
+      "CORRIDOR_AUD8": {
+        "id": "CORRIDOR_AUD8",
+        "plan": "main",
+        "floor": 0,
+        "region": "corridor",
+        "x": -24.223203602969463,
+        "y": 12.120823217683979,
+        "normal": {
+          "x": -0.9822872507286886,
+          "y": 0.18738131458572502
+        }
+      },
+      "FOYER_F0": {
+        "id": "FOYER_F0",
+        "plan": "main",
+        "floor": 0,
+        "region": "foyer",
+        "x": 4.796961653394553,
+        "y": 32.85,
+        "normal": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "FOYER_F1": {
+        "id": "FOYER_F1",
+        "plan": "main",
+        "floor": 0,
+        "region": "foyer",
+        "x": 1.5675479029086122e-15,
+        "y": 32.85,
+        "normal": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "FOYER_F2": {
+        "id": "FOYER_F2",
+        "plan": "main",
+        "floor": 0,
+        "region": "foyer",
+        "x": -4.796961653394556,
+        "y": 32.85,
+        "normal": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "FOYER_BACK_E": {
+        "id": "FOYER_BACK_E",
+        "plan": "main",
+        "floor": 0,
+        "region": "foyer",
+        "x": 10.6,
+        "y": 35.3,
+        "normal": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "FOYER_BACK_W": {
+        "id": "FOYER_BACK_W",
+        "plan": "main",
+        "floor": 0,
+        "region": "foyer",
+        "x": -10.6,
+        "y": 35.3,
+        "normal": {
+          "x": 0,
+          "y": 1
+        }
+      },
+      "GROUND_STAGE_E": {
+        "id": "GROUND_STAGE_E",
+        "plan": "main",
+        "floor": 0,
+        "region": "stage-east",
+        "x": 23.1,
+        "y": 5.3,
+        "normal": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      "GROUND_STAGE_W": {
+        "id": "GROUND_STAGE_W",
+        "plan": "main",
+        "floor": 0,
+        "region": "stage-west",
+        "x": -23.1,
+        "y": 5.3,
+        "normal": {
+          "x": -1,
+          "y": 0
+        }
+      }
+    },
+    "portals": [
+      {
+        "id": "ACCESS1",
+        "type": "access",
+        "from": "aisle",
+        "floor": 0,
+        "plan": "main",
+        "x": 16.474058939939937,
+        "y": 8.796536556902637,
+        "width": 1.3,
+        "evacuationAllowed": true,
+        "angle": 0.07853981633974483,
+        "sourceZone": "orchestra",
+        "toEntrance": "LOGE_ACCESS_1",
+        "length": 1.5,
+        "flights": [
+          1.5
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": false
+      },
+      {
+        "id": "ACCESS2",
+        "type": "access",
+        "from": "aisle",
+        "floor": 0,
+        "plan": "main",
+        "x": 12.8966124812659,
+        "y": 17.832134895947526,
+        "width": 1.3,
+        "evacuationAllowed": true,
+        "angle": 0.6754424205218055,
+        "sourceZone": "orchestra",
+        "toEntrance": "LOGE_ACCESS_2",
+        "length": 1.5,
+        "flights": [
+          1.5
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": false
+      },
+      {
+        "id": "ACCESS3",
+        "type": "access",
+        "from": "aisle",
+        "floor": 0,
+        "plan": "main",
+        "x": 4.859016374463821,
+        "y": 23.294479569542403,
+        "width": 1.3,
+        "evacuationAllowed": true,
+        "angle": 1.2723450247038663,
+        "sourceZone": "orchestra",
+        "toEntrance": "LOGE_ACCESS_3",
+        "length": 1.5,
+        "flights": [
+          1.5
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": false
+      },
+      {
+        "id": "ACCESS4",
+        "type": "access",
+        "from": "aisle",
+        "floor": 0,
+        "plan": "main",
+        "x": -4.8590163744638195,
+        "y": 23.294479569542403,
+        "width": 1.3,
+        "evacuationAllowed": true,
+        "angle": 1.8692476288859268,
+        "sourceZone": "orchestra",
+        "toEntrance": "LOGE_ACCESS_4",
+        "length": 1.5,
+        "flights": [
+          1.5
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": false
+      },
+      {
+        "id": "ACCESS5",
+        "type": "access",
+        "from": "aisle",
+        "floor": 0,
+        "plan": "main",
+        "x": -12.8966124812659,
+        "y": 17.832134895947526,
+        "width": 1.3,
+        "evacuationAllowed": true,
+        "angle": 2.466150233067988,
+        "sourceZone": "orchestra",
+        "toEntrance": "LOGE_ACCESS_5",
+        "length": 1.5,
+        "flights": [
+          1.5
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": false
+      },
+      {
+        "id": "ACCESS6",
+        "type": "access",
+        "from": "aisle",
+        "floor": 0,
+        "plan": "main",
+        "x": -16.474058939939937,
+        "y": 8.79653655690264,
+        "width": 1.3,
+        "evacuationAllowed": true,
+        "angle": 3.0630528372500483,
+        "sourceZone": "orchestra",
+        "toEntrance": "LOGE_ACCESS_6",
+        "length": 1.5,
+        "flights": [
+          1.5
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": false
+      },
+      {
+        "id": "AUD0",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": 22.838178579442012,
+        "y": 11.856615564118098,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 0.18849555921538758,
+        "toEntrance": "CORRIDOR_AUD0",
+        "rare": false
+      },
+      {
+        "id": "AUD1",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": 20.01225212784169,
+        "y": 19.335212916196134,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 0.5340707511102649,
+        "toEntrance": "CORRIDOR_AUD1",
+        "rare": false
+      },
+      {
+        "id": "AUD2",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": 14.820107761657034,
+        "y": 25.4144328945371,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 0.8796459430051422,
+        "toEntrance": "CORRIDOR_AUD2",
+        "rare": false
+      },
+      {
+        "id": "AUD3",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": 7.875656645703027,
+        "y": 29.37547787818574,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 1.2252211349000193,
+        "toEntrance": "CORRIDOR_AUD3",
+        "rare": false
+      },
+      {
+        "id": "AUD4",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": 1.423651904008798e-15,
+        "y": 30.75,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 1.5707963267948966,
+        "toEntrance": "CORRIDOR_AUD4",
+        "rare": false
+      },
+      {
+        "id": "AUD5",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": -7.875656645703025,
+        "y": 29.37547787818574,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 1.9163715186897738,
+        "toEntrance": "CORRIDOR_AUD5",
+        "rare": false
+      },
+      {
+        "id": "AUD6",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": -14.820107761657036,
+        "y": 25.4144328945371,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 2.261946710584651,
+        "toEntrance": "CORRIDOR_AUD6",
+        "rare": false
+      },
+      {
+        "id": "AUD7",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": -20.012252127841688,
+        "y": 19.335212916196134,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 2.607521902479528,
+        "toEntrance": "CORRIDOR_AUD7",
+        "rare": false
+      },
+      {
+        "id": "AUD8",
+        "type": "door",
+        "from": "rim",
+        "floor": 0,
+        "plan": "main",
+        "x": -22.838178579442012,
+        "y": 11.856615564118107,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 2.9530970943744053,
+        "toEntrance": "CORRIDOR_AUD8",
+        "rare": false
+      },
+      {
+        "id": "F0",
+        "type": "door",
+        "from": "corridor",
+        "floor": 0,
+        "plan": "main",
+        "x": 4.796961653394553,
+        "y": 32.64655361865443,
+        "width": 1.65,
+        "evacuationAllowed": true,
+        "angle": 1.382300767579509,
+        "toEntrance": "FOYER_F0",
+        "rare": false
+      },
+      {
+        "id": "F1",
+        "type": "door",
+        "from": "corridor",
+        "floor": 0,
+        "plan": "main",
+        "x": 1.5675479029086122e-15,
+        "y": 33.1,
+        "width": 1.65,
+        "evacuationAllowed": true,
+        "angle": 1.5707963267948966,
+        "toEntrance": "FOYER_F1",
+        "rare": false
+      },
+      {
+        "id": "F2",
+        "type": "door",
+        "from": "corridor",
+        "floor": 0,
+        "plan": "main",
+        "x": -4.796961653394556,
+        "y": 32.64655361865443,
+        "width": 1.65,
+        "evacuationAllowed": true,
+        "angle": 1.7592918860102844,
+        "toEntrance": "FOYER_F2",
+        "rare": false
+      },
+      {
+        "id": "M0",
+        "type": "exit",
+        "from": "foyer",
+        "floor": 0,
+        "plan": "main",
+        "x": -4.7,
+        "y": 41.2,
+        "width": 1.75,
+        "evacuationAllowed": true,
+        "exitId": "MAIN",
+        "normal": {
+          "x": 0,
+          "y": 1
+        },
+        "rare": false
+      },
+      {
+        "id": "M1",
+        "type": "exit",
+        "from": "foyer",
+        "floor": 0,
+        "plan": "main",
+        "x": -2.35,
+        "y": 41.2,
+        "width": 1.75,
+        "evacuationAllowed": true,
+        "exitId": "MAIN",
+        "normal": {
+          "x": 0,
+          "y": 1
+        },
+        "rare": false
+      },
+      {
+        "id": "M2",
+        "type": "exit",
+        "from": "foyer",
+        "floor": 0,
+        "plan": "main",
+        "x": 0.0,
+        "y": 41.2,
+        "width": 1.75,
+        "evacuationAllowed": true,
+        "exitId": "MAIN",
+        "normal": {
+          "x": 0,
+          "y": 1
+        },
+        "rare": false
+      },
+      {
+        "id": "M3",
+        "type": "exit",
+        "from": "foyer",
+        "floor": 0,
+        "plan": "main",
+        "x": 2.35,
+        "y": 41.2,
+        "width": 1.75,
+        "evacuationAllowed": true,
+        "exitId": "MAIN",
+        "normal": {
+          "x": 0,
+          "y": 1
+        },
+        "rare": false
+      },
+      {
+        "id": "M4",
+        "type": "exit",
+        "from": "foyer",
+        "floor": 0,
+        "plan": "main",
+        "x": 4.7,
+        "y": 41.2,
+        "width": 1.75,
+        "evacuationAllowed": true,
+        "exitId": "MAIN",
+        "normal": {
+          "x": 0,
+          "y": 1
+        },
+        "rare": false
+      },
+      {
+        "id": "SIDE_E1",
+        "type": "exit",
+        "from": "corridor",
+        "floor": 0,
+        "plan": "main",
+        "x": 24.324478110342444,
+        "y": 19.893940642889625,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 0.47123889803846897,
+        "exitId": "SIDE_E1",
+        "normal": {
+          "x": 0.8910065241883679,
+          "y": 0.45399049973954675
+        },
+        "rare": true
+      },
+      {
+        "id": "SIDE_E2",
+        "type": "exit",
+        "from": "corridor",
+        "floor": 0,
+        "plan": "main",
+        "x": 13.151875302976824,
+        "y": 31.42317236519748,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 1.0681415022205298,
+        "exitId": "SIDE_E2",
+        "normal": {
+          "x": 0.48175367410171516,
+          "y": 0.8763066800438637
+        },
+        "rare": true
+      },
+      {
+        "id": "SIDE_W2",
+        "type": "exit",
+        "from": "corridor",
+        "floor": 0,
+        "plan": "main",
+        "x": -13.151875302976832,
+        "y": 31.423172365197473,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 2.0734511513692637,
+        "exitId": "SIDE_W2",
+        "normal": {
+          "x": -0.48175367410171543,
+          "y": 0.8763066800438635
+        },
+        "rare": true
+      },
+      {
+        "id": "SIDE_W1",
+        "type": "exit",
+        "from": "corridor",
+        "floor": 0,
+        "plan": "main",
+        "x": -24.32447811034244,
+        "y": 19.893940642889632,
+        "width": 1.35,
+        "evacuationAllowed": true,
+        "angle": 2.670353755551324,
+        "exitId": "SIDE_W1",
+        "normal": {
+          "x": -0.8910065241883678,
+          "y": 0.45399049973954686
+        },
+        "rare": true
+      },
+      {
+        "id": "BACK_E",
+        "type": "stairs",
+        "from": "balcony-rim",
+        "floor": 1,
+        "plan": "balcony",
+        "x": 10.509880068970508,
+        "y": 28.126801034960714,
+        "width": 1.6,
+        "evacuationAllowed": true,
+        "angle": 1.0995574287564276,
+        "toEntrance": "FOYER_BACK_E",
+        "length": 15.0,
+        "flights": [
+          7.5,
+          7.5
+        ],
+        "laneCount": 2,
+        "laneDivider": 0.1,
+        "rare": false
+      },
+      {
+        "id": "BACK_W",
+        "type": "stairs",
+        "from": "balcony-rim",
+        "floor": 1,
+        "plan": "balcony",
+        "x": -10.509880068970507,
+        "y": 28.126801034960714,
+        "width": 1.6,
+        "evacuationAllowed": true,
+        "angle": 2.0420352248333655,
+        "toEntrance": "FOYER_BACK_W",
+        "length": 15.0,
+        "flights": [
+          7.5,
+          7.5
+        ],
+        "laneCount": 2,
+        "laneDivider": 0.1,
+        "rare": false
+      },
+      {
+        "id": "STAGE_E",
+        "type": "stairs",
+        "from": "balcony-rim",
+        "floor": 1,
+        "plan": "balcony",
+        "x": 23.078636275921912,
+        "y": 9.31632806609961,
+        "width": 1.15,
+        "evacuationAllowed": true,
+        "angle": 0.07853981633974483,
+        "toEntrance": "GROUND_STAGE_E",
+        "length": 12.0,
+        "flights": [
+          12.0
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": true
+      },
+      {
+        "id": "STAGE_W",
+        "type": "stairs",
+        "from": "balcony-rim",
+        "floor": 1,
+        "plan": "balcony",
+        "x": -23.078636275921912,
+        "y": 9.316328066099613,
+        "width": 1.15,
+        "evacuationAllowed": true,
+        "angle": 3.0630528372500483,
+        "toEntrance": "GROUND_STAGE_W",
+        "length": 12.0,
+        "flights": [
+          12.0
+        ],
+        "laneCount": 1,
+        "laneDivider": 0,
+        "rare": true
+      },
+      {
+        "id": "GROUND_STAGE_E",
+        "type": "exit",
+        "from": "stage-east",
+        "floor": 0,
+        "plan": "main",
+        "x": 24.25,
+        "y": 5.3,
+        "width": 1.15,
+        "evacuationAllowed": true,
+        "exitId": "STAGE_E",
+        "normal": {
+          "x": 1,
+          "y": 0
+        },
+        "rare": true
+      },
+      {
+        "id": "GROUND_STAGE_W",
+        "type": "exit",
+        "from": "stage-west",
+        "floor": 0,
+        "plan": "main",
+        "x": -24.25,
+        "y": 5.3,
+        "width": 1.15,
+        "evacuationAllowed": true,
+        "exitId": "STAGE_W",
+        "normal": {
+          "x": -1,
+          "y": 0
+        },
+        "rare": true
+      },
+      {
+        "id": "ADA_W",
+        "type": "elevator",
+        "from": "foyer",
+        "floor": 0,
+        "plan": "main",
+        "x": -11.2,
+        "y": 39.0,
+        "width": 1.2,
+        "evacuationAllowed": false,
+        "prohibitedReason": "Elevator excluded from evacuation by the supplied specification.",
+        "rare": false
+      }
+    ],
+    "exteriorContext": {
+      "simulated": false,
+      "monumentalStaircase": {
+        "x": 0,
+        "y": 43.5,
+        "width": 14.0
+      },
+      "porticoStaircases": 2,
+      "note": "Outdoor stairs are context only: completion occurs at first-floor exterior thresholds."
+    },
+    "unitTreatment": "All seats are equal units with identical body radius; no separate wheelchair class or extra wheelchair participants."
+  },
+  "distributions": {
+    "sanity": {
+      "type": "beta",
+      "mean": 0.75,
+      "sd": 0.16
+    },
+    "groupthink": {
+      "type": "beta",
+      "mean": 0.55,
+      "sd": 0.2
+    },
+    "pack": {
+      "type": "beta",
+      "mean": 0.45,
+      "sd": 0.22
+    },
+    "norms": {
+      "type": "beta",
+      "mean": 0.65,
+      "sd": 0.17
+    },
+    "speed": {
+      "type": "normal",
+      "mean": 1.29,
+      "sd": 0.19,
+      "min": 0.5,
+      "max": 2.3
+    },
+    "reaction": {
+      "type": "lognormal",
+      "mean": 2,
+      "sd": 1.2,
+      "min": 0,
+      "max": 40
+    },
+    "radius": {
+      "type": "normal",
+      "mean": 0.2025,
+      "sd": 0
+    }
+  }
+}

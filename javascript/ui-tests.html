@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Simulator interface tests</title>
+<link rel="stylesheet" href="style.css"></head><body>
+<header><h1>Simulator interface tests</h1><p id="summary">Running…</p></header>
+<pre id="results" style="max-height:none"></pre>
+<iframe id="app" src="index.html" title="Simulator under test" style="width:1100px;height:900px"></iframe>
+<script>
+document.getElementById('app').onload = function () {
+  const frame = this, doc = frame.contentDocument, results = [];
+  const get = id => doc.getElementById(id);
+  function test(name, action) {
+    try { action(); results.push('PASS ' + name); }
+    catch (e) { results.push('FAIL ' + name + ': ' + e.message); }
+  }
+  function assert(value, message) { if (!value) throw new Error(message); }
+  test('Initial model renders and can advance', () => {
+    assert(get('exited').textContent === '0 / 150', 'Initial population missing');
+    get('step').click(); assert(get('time').textContent === '1', 'Step did not advance');
+    assert(get('legend').children.length === 4, 'Four exits not rendered');
+  });
+  test('Playback toggles between run and pause', () => {
+    get('toggle').click(); assert(get('toggle').textContent === 'Pause', 'Run did not start');
+    get('toggle').click(); assert(get('toggle').textContent === 'Run', 'Pause did not stop');
+  });
+  test('Invalid setup reports error without replacing the experiment', () => {
+    get('participants').value = '-1'; get('reset').click();
+    assert(get('status').className === 'error', 'Error not displayed');
+    assert(get('time').textContent === '1', 'Existing run was replaced');
+  });
+  test('JSON config updates geometry and a small run finishes', () => {
+    get('configuration').value = JSON.stringify({ participants: 5, seed: 11, geometry: { size: 11 } });
+    get('apply').click(); assert(get('exited').textContent === '0 / 5', 'JSON was not applied');
+    for (let i = 0; i < 1000 && !get('step').disabled; i++) get('step').click();
+    assert(get('exited').textContent === '5 / 5', 'Small run did not clear');
+    assert(get('status').textContent.startsWith('Complete:'), 'Completion not reported');
+    assert(get('toggle').disabled, 'Completed run still enabled');
+  });
+  test('Malformed JSON reports an actionable error', () => {
+    get('configuration').value = '{'; get('apply').click();
+    assert(get('status').className === 'error', 'Malformed JSON not reported');
+  });
+  document.getElementById('summary').textContent = `${results.filter(r => r.startsWith('PASS')).length} / ${results.length} interface tests passed`;
+  document.getElementById('results').textContent = results.join('\n');
+};
+</script></body></html>

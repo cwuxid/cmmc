@@ -1,0 +1,823 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,array}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\ind}{\mathbf{1}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\clip}{\operatorname{clip}}
+\newcommand{\wrap}{\operatorname{wrap}}
+\title{Mathematical Specification of the Auditorium Geometry\\and Its Interaction with Agents}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\section{Scope and interpretation}
+
+This specification describes the current two-plan Python implementation,
+including the removal of familiarity from behavioral utility. It is a
+specification of the implemented simulation, rather than a surveyed or
+regulatory description of Bailey Hall. The seat inventories and connection
+counts follow the supplied building description; metric dimensions, travel
+lengths, visibility surfaces, and throughput coefficients are schematic.
+
+The building is a hybrid spatial system: agents move continuously within
+state-dependent planar regions and change regions or floors through discrete
+transitions. It is not represented by one unrestricted polygon or by a fully
+resolved three-dimensional mesh. In particular, overlap between two regions'
+coordinate descriptions does not authorize an agent to change its region.
+
+Coordinates and lengths below are in metres, time in seconds, velocities in
+metres per second, and mathematical angles in radians. Numerical parameters
+are a snapshot of \code{default_world.json} and
+\code{default_policy_settings.json} at the time of writing. Later configuration
+edits supersede the numerical values in this document.
+
+\section{Coordinate system and independent floor plans}
+
+Let the occupied floor labels be
+\[
+ \mathcal{L}=\{0,1\},
+\]
+where $0$ is the main plan containing orchestra, loge, corridor, and foyer,
+and $1$ is the balcony plan. The elevated loge remains on plan $0$; the
+orchestra-to-loge ascent is represented by explicit access connectors.
+No continuous height coordinate or gravitational dynamics is assigned.
+
+Both plans use the reference centre
+\[
+ \mathbf c=(0,7.5)^{\mathsf T}.
+\]
+For $\mathbf x=(x,y)^{\mathsf T}$ define
+\begin{align}
+ r(\mathbf x)&=\sqrt{x^2+(y-7.5)^2},\\
+ \theta(\mathbf x)&=\operatorname{atan2}(y-7.5,x),\\
+ \mathbf p(r,\theta)&=(r\cos\theta,\;7.5+r\sin\theta)^{\mathsf T}.
+\end{align}
+The principal auditorium construction occupies the semicircle
+$0\leq\theta\leq\pi$. Increasing $y$ generally points toward the rear foyer
+in the drawing; these coordinates are not georeferenced survey coordinates.
+Angular fractions stored in the configuration are multiplied by $\pi$.
+
+An agent's hybrid state may be written
+\[
+ S_i(t)=\bigl(\ell_i,q_i,z_i,\mathbf x_i,\mathbf v_i,a_i,
+                  s_i,u_i,\mathcal M_i,\chi_i\bigr),
+\]
+where $\ell_i$ is its floor, $q_i$ its region, $z_i$ its seating zone,
+$a_i$ its body radius, $s_i$ its initial seat, $u_i$ its current local target,
+$\mathcal M_i$ its memory, and $\chi_i$ its transit or completion state.
+The implementation uses floor $-1$ for transit and $-2$ for completed agents.
+Identical planar coordinates on different floors do not imply interaction.
+
+\section{Seating construction and population initialization}
+
+\subsection{Section parameters}
+
+\begin{center}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Section & Floor & Seats $C_s$ & Rows $J_s$ & First radius & Row spacing & Pitch\\
+\midrule
+Orchestra & 0 & 527 & 16 & 6.70 & 0.64 & 0.58\\
+Loge      & 0 & 486 &  7 & 17.50 & 0.68 & 0.60\\
+Balcony   & 1 & 316 &  9 & 16.00 & 0.68 & 0.67\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The total inventory is
+\[
+ C=527+486+316=1329.
+\]
+No additional wheelchair agents or wheelchair-specific motion classes are
+introduced. Every occupied seat corresponds to one agent with the same
+default body radius, although preferred speeds and behavioral weights vary.
+
+For row index $j\in\{0,\ldots,J_s-1\}$,
+\[
+ R_{s,j}=R_{s,0}+j\Delta R_s.
+\]
+The six principal aisle bearings are
+\[
+ (\alpha_1,\ldots,\alpha_6)
+ =\pi(0.025,0.215,0.405,0.595,0.785,0.975).
+\]
+The row-block construction uses the ordered boundary list
+\[
+ (\beta_0,\ldots,\beta_7)
+ =\pi(0.02,0.025,0.215,0.405,0.595,0.785,0.975,0.98).
+\]
+The nominal aisle half-width is $h=1.3$, hence the nominal full width is $2.6$.
+
+\subsection{Seat allocation within rows and blocks}
+
+For adjacent bearings $(\beta_b,\beta_{b+1})$, define the usable row length
+and provisional seat capacity by
+\begin{align}
+ L_{s,j,b}&=R_{s,j}(\beta_{b+1}-\beta_b)-2h,\\
+ M_{s,j,b}&=\max\!\left\{0,
+             \left\lfloor\frac{L_{s,j,b}}{\text{pitch}_s}\right\rfloor+1\right\}.
+\end{align}
+Blocks with $M_{s,j,b}=0$ are omitted. Let
+$M_s=\sum_{j,b}M_{s,j,b}$. The actual allocation begins with
+\[
+ n_{s,j,b}=\left\lfloor C_s\frac{M_{s,j,b}}{M_s}\right\rfloor.
+\]
+Remaining seats are assigned to the largest fractional remainders, breaking
+ties by row and block index. Consequently $\sum_{j,b}n_{s,j,b}=C_s$ exactly.
+This requires $M_s\geq C_s$.
+
+Seat-centre bearing limits within an occupied block are
+\[
+ \theta^-_{s,j,b}=\beta_b+\frac{h}{R_{s,j}},\qquad
+ \theta^+_{s,j,b}=\beta_{b+1}-\frac{h}{R_{s,j}}.
+\]
+For $n=n_{s,j,b}>1$ and $k=0,\ldots,n-1$,
+\[
+ \theta_{s,j,b,k}=\theta^-_{s,j,b}
+     +\frac{k}{n-1}(\theta^+_{s,j,b}-\theta^-_{s,j,b}),\qquad
+ \mathbf x_{s,j,b,k}=\mathbf p(R_{s,j},\theta_{s,j,b,k}).
+\]
+A single seat is placed at the angular midpoint. Pitch controls provisional
+capacity; final centres are evenly spread over each allocated block and do
+not necessarily have exactly that pitch.
+
+\subsection{Occupancy for a requested population}
+
+For integer $1\leq n\leq1329$, allocate agents proportionally:
+\[
+ n_s^{(0)}=\left\lfloor n\frac{C_s}{1329}\right\rfloor.
+\]
+Largest fractional remainders distribute the remaining agents among sections.
+Seats are sampled without replacement within each section using the seeded
+generator. At $n=300$, the counts are 119 orchestra, 110 loge, and 71 balcony.
+Agent identity and initial seat identity persist across all transfers.
+
+\section{State-dependent navigable regions}
+
+\subsection{Seating-zone aisle extents}
+
+\begin{center}
+\begin{tabular}{llrrl}
+\toprule
+Zone & Floor & $R_z^-$ & $R_z^+$ & Outward continuation\\
+\midrule
+Orchestra & 0 & 6.30 & 16.525 & Access connector to loge\\
+Loge      & 0 & 17.30 & 22.20 & Main circulation rim\\
+Balcony   & 1 & 15.70 & 22.75 & Balcony circulation rim\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For an agent assigned aisle bearing $\alpha_i$, the aisle centre-domain is
+\[
+ \mathcal I_i=\left\{\mathbf x:
+ |r(\mathbf x)(\theta(\mathbf x)-\alpha_i)|
+       \leq h-a_i-0.02,\quad
+ R_{z_i}^- -0.08\leq r(\mathbf x)\leq R_{z_i}^++0.03\right\}.
+\]
+The lateral expression is an arc-based approximation, rather than the exact
+perpendicular distance to a radial line.
+
+\subsection{Seat-row motion domains}
+
+For an agent whose initial row radius is $R_i$ and row-end bearings are
+$\theta_i^-,\theta_i^+$, the row acceptance predicate is
+\[
+ |r(\mathbf x)-R_i|<0.07,\qquad
+ \theta_i^- -0.012\leq\theta(\mathbf x)\leq\theta_i^++0.012,
+\]
+on the initial seat's floor. The angular tolerance $0.012$ is in radians.
+Actual accepted row motion is projected onto $r=R_i$ as described below.
+Unoccupied seats are not individual solid obstacles; row restrictions prevent
+radial shortcuts through seating blocks.
+
+\subsection{Curved circulation regions}
+
+Write
+\[
+ \mathcal A(R^-,R^+,\gamma^-,\gamma^+)
+ =\{\mathbf x:R^-\leq r(\mathbf x)\leq R^+,\;
+                     \pi\gamma^-\leq\theta(\mathbf x)\leq\pi\gamma^+\}.
+\]
+The configured regions are
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+Region & Floor & $R^-$ & $R^+$ & $\gamma^-$ & $\gamma^+$\\
+\midrule
+Main rim    & 0 & 22.02 & 24.05 & 0.012 & 0.988\\
+Corridor    & 0 & 24.00 & 27.30 & 0.005 & 0.995\\
+Balcony rim & 1 & 22.57 & 24.50 & 0.008 & 0.992\\
+\bottomrule
+\end{tabular}
+\end{center}
+These annular bounds constrain body centres directly. Unlike the rectangular
+regions below, the implementation does not uniformly erode these annuli by
+body radius. Additional clearance enters waypoint placement, obstacle forces,
+and doorway checks. Thus this is not a uniform disc-eroded floor polygon.
+
+\subsection{Rectangular regions}
+
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+Region & Floor & $x^-$ & $x^+$ & $y^-$ & $y^+$\\
+\midrule
+Foyer              & 0 & -12.40 & 12.40 & 32.20 & 41.20\\
+East stage landing & 0 & 21.50  & 24.25 & 3.80 & 6.80\\
+West stage landing & 0 & -24.25 & -21.50 & 3.80 & 6.80\\
+\bottomrule
+\end{tabular}
+\end{center}
+Away from an exit apron, an agent centre must satisfy
+\[
+ x^-+a_i\leq x_i\leq x^+-a_i,\qquad
+ y^-+a_i\leq y_i\leq y^+-a_i.
+\]
+Floor and region labels must also match. The three rectangular patches and
+the annular regions are linked by the transition graph, not by unrestricted
+movement through their geometric union.
+
+\section{Orchestra--loge barrier}
+
+The nominal barrier has centre radius $R_B=16.9$, radial thickness $b_B=0.35$,
+and six openings of width $w_B=1.3$ at bearings $\alpha_1,\ldots,\alpha_6$.
+Its occupied radial band is $[16.725,17.075]$ within the auditorium semicircle.
+
+For a main-floor agent, the implementation declares radial body overlap when
+\[
+ |r_i-R_B|<\frac{b_B}{2}+a_i.
+\]
+Such a position is accepted only when an opening fits the body:
+\[
+ \exists k\in\{1,\ldots,6\}:\quad
+       r_i|\theta_i-\alpha_k|\leq\frac{w_B}{2}-a_i-0.01.
+\]
+This barrier predicate supplements the region predicate. It does not create
+a continuous orchestra-to-loge walking surface: a successful access admission
+initiates the timed transfer defined later.
+
+\section{Portal topology and coordinates}
+
+\subsection{Directed hybrid graph}
+
+Let $\mathcal G=(\mathcal V,\mathcal P)$ be a directed multigraph of region
+states and portals. A portal contains its source floor, source region,
+optional source zone, width, position, type, availability flag, and either a
+named destination entrance or an exterior exit identity.
+
+The principal paths are
+\begin{align*}
+ \text{orchestra row}&\longrightarrow\text{orchestra aisle}
+ \xrightarrow{\mathrm{ACCESS}}\text{loge aisle},\\
+ \text{loge row}&\longrightarrow\text{loge aisle}
+ ,\\
+ \text{loge aisle}&\longrightarrow\text{main rim}
+ \xrightarrow{\mathrm{AUD}}\text{corridor},\\
+ \text{corridor}&\xrightarrow{\mathrm F}\text{foyer}
+ \xrightarrow{\mathrm M}\text{outside},\\
+ \text{corridor}&\xrightarrow{\mathrm{SIDE}}\text{outside},\\
+ \text{balcony row}&\longrightarrow\text{balcony aisle}
+ \longrightarrow\text{balcony rim}
+ \xrightarrow{\mathrm{BACK}}\text{foyer},\\
+ \text{balcony rim}&\xrightarrow{\mathrm{STAGE}}
+       \text{first-floor stage landing}
+ \xrightarrow{\mathrm{GROUND\_STAGE}}\text{outside}.
+\end{align*}
+
+There are 34 configured portals: six access connectors, nine auditorium doors,
+three foyer-entry doors, four balcony stair connectors, eleven exterior
+thresholds, and one excluded elevator. There are 22 named arrival entrances.
+Exterior doors do not require a destination entrance.
+
+\subsection{Parametric portal locations}
+
+\begin{longtable}{p{0.20\linewidth}p{0.56\linewidth}r}
+\toprule
+Family & Position or bearing definition & Width\\
+\midrule
+\endhead
+ACCESS1--6 & $\mathbf p(16.525,\alpha_k)$ & 1.30\\
+AUD0--8 & $\mathbf p(23.25,\pi(0.06+0.11j))$, $j=0,\ldots,8$ & 1.35\\
+F0--2 & $\mathbf p(25.6,\pi(0.44+0.06j))$, $j=0,1,2$ & 1.65\\
+M0--4 & $((j-2)2.35,41.2)^{\mathsf T}$, $j=0,\ldots,4$ & 1.75\\
+SIDE E1, E2, W2, W1 & $\mathbf p(27.3,\pi f)$ for $f\in\{0.15,0.34,0.66,0.85\}$ & 1.35\\
+BACK E, W & $\mathbf p(23.15,\pi f)$ for $f\in\{0.35,0.65\}$ & 1.60\\
+STAGE E, W & $\mathbf p(23.15,\pi f)$ for $f\in\{0.025,0.975\}$ & 1.15\\
+GROUND STAGE E, W & $(24.25,5.3)^{\mathsf T}$ and $(-24.25,5.3)^{\mathsf T}$ & 1.15\\
+ADA W & $(-11.2,39.0)^{\mathsf T}$; excluded from evacuation & 1.20\\
+\bottomrule
+\end{longtable}
+
+The five M thresholds share the reported exit category \code{MAIN}. The
+balcony STAGE portals are transfers, whereas GROUND STAGE portals are final
+thresholds. A shared identifier in the entrance and portal namespaces does
+not imply shared coordinates or immediate completion.
+
+\subsection{Named destination entrances}
+
+The access destinations are $\mathbf p(17.42,\alpha_k)$ in loge aisles.
+AUD destinations are $\mathbf p(24.66,\phi_j)$ in the corridor, where
+$\phi_j=\pi(0.06+0.11j)$. Both families have outward radial arrival normals.
+Foyer-entry destinations retain their corresponding F-door $x$ coordinate
+and have $y=32.85$, with arrival normal $(0,1)^{\mathsf T}$.
+
+BACK E and W arrive at $(10.6,35.3)^{\mathsf T}$ and
+$(-10.6,35.3)^{\mathsf T}$, respectively, with normal $(0,1)^{\mathsf T}$.
+STAGE E and W arrive at $(23.1,5.3)^{\mathsf T}$ and
+$(-23.1,5.3)^{\mathsf T}$, with normals $(1,0)^{\mathsf T}$ and
+$(-1,0)^{\mathsf T}$. These arrivals are still inside the first-floor plan.
+
+\section{Agent bodies and geometric acceptance}
+
+The default radius is fixed:
+\[
+ a_i=0.2025\qquad(i=1,\ldots,n).
+\]
+The model treats each active planar body as a disc for interpersonal exclusion.
+For two agents on the same floor, a candidate centre $\mathbf x$ must satisfy
+\[
+ \|\mathbf x-\mathbf x_j\|^2\geq1.005(a_i+a_j)^2.
+\]
+With equal default radii this is approximately $0.406$ metres of centre
+separation. Agents on other floors, agents in transit, and completed agents
+are absent from this planar collision test.
+
+Let $C_i(\mathbf x;q_i,z_i,\ell_i)$ denote the implemented state-dependent
+region/barrier/apron predicate. The admissible endpoint set at a sequential
+update is
+\[
+ \mathcal F_i(t)=\left\{\mathbf x:C_i(\mathbf x;q_i,z_i,\ell_i)=1,
+ \ \|\mathbf x-\mathbf x_j\|^2\geq1.005(a_i+a_j)^2
+ \text{ for active }j\ne i\text{ on floor }\ell_i\right\}.
+\]
+Exit enablement and capacity add crossing constraints. Region enforcement,
+hard-body exclusion, and door capacity are enabled in the current world.
+Ordinary body/wall checks are primarily endpoint checks, not complete swept
+disc collision detection; exterior threshold intersections are swept tests.
+
+\section{Local actions, visibility, and route choice}
+
+\subsection{Available and perceived targets}
+
+An action identifies a next local target: a row end, aisle continuation,
+eligible door or connector, or a short exploration waypoint. Portal
+eligibility requires source floor, source region, evacuation permission,
+and any required source zone to match. An access connector also requires
+$|\phi_p-\alpha_i|<10^{-6}$.
+
+Newly observed targets must satisfy
+\[
+ \|\mathbf p_a-\mathbf x_i\|\leq R_{\rm view},\qquad
+ \widehat{\mathbf h}_i\cdot
+ \frac{\mathbf p_a-\mathbf x_i}{\|\mathbf p_a-\mathbf x_i\|}
+ \geq\cos(\Phi/2),
+\]
+and the configured line of sight must be unblocked. Current values are
+$R_{\rm view}=12$ and $\Phi=2\pi$, permitting an all-around scan.
+Nearby-person observation has the separate range $R_{\rm obs}=4$.
+
+Visibility uses the barrier surfaces and openings, a schematic auditorium
+wall at corridor inner radius $24.0$ with enabled AUD apertures, foyer walls
+with F/M apertures, and optional floor-specific line segments in
+\code{visibilityWalls}. Body and seat occlusion and eye height are not modeled.
+Additional visibility segments do not create physical collision walls.
+
+Previously observed targets, the current target, and locations remembered
+from admission may remain available outside instantaneous sight. Recorded
+admission paths can be supplied by seat; otherwise a path from M2 is
+reconstructed through reverse portal topology. This initialization does not
+simulate a pre-emergency admission crowd. Remembering a target gives no
+familiarity reward in utility.
+
+When no door is seen or remembered in an annular region, short local left/right
+search targets are generated from region bounds, without using hidden door
+locations. With no action elsewhere, the stationary scan heading rotates on
+the next decision. Known closed portals are excluded. Closure discovery occurs
+within $2.2$ metres when the eligible portal is visible.
+
+\subsection{Distance and behavioral features}
+
+Distance to a row end is the remaining row arc length. For an annular portal,
+the approximation is
+\[
+ d_i(a,t)=r_i|\wrap(\phi_a-\theta_i)|+|r_i-r(\mathbf p_a)|,
+\]
+where $\wrap(\psi)=\operatorname{atan2}(\sin\psi,\cos\psi)$.
+An ordinary aisle continuation uses $\max(0,R_z^+-r_i)$; other actions use
+Euclidean target distance. These are local travel estimates, not globally
+optimal path lengths.
+
+The current four-dimensional behavioral feature vector is
+\[
+ \mathbf X_i(a,t)=(-T_i(a,t),\;P_i(a,t),\;-N_i(a,t),\;-C_i(a,t))^{\mathsf T}.
+\]
+There is no familiarity feature or weight. Perceived time is
+\[
+ T_i(a,t)=\frac{1}{\tau_T}\left[
+ \frac{d_i(a,t)}{\max(0.35,v_i^0)}+Q_i(a,t)+B_i(a,t)\right].
+\]
+The current normalization is $\tau_T=1$ second. When enabled, $Q_i$ estimates
+delay from observed earlier-priority people waiting ahead at that portal,
+using their count divided by $\max(0.1,1.3w_p)$. Waiting means speed at most
+$0.25$ within $3$ metres of the selected portal. Priority follows first-wait
+time, with agent ID breaking exact ties.
+
+$B_i$ is an optional opposing-row blockage estimate. If the agent has been
+physically blocked since $t_b$ and observes an opposing person ahead in the
+same seat row and block, the obstructed action receives
+\[
+ B_i(a,t)=\kappa_B\bigl(\max(0,t-t_b)+\tau_{\rm dec}\bigr),\qquad\kappa_B=1.
+\]
+Otherwise it is zero. This extrapolation from experienced waiting is a
+heuristic, not a measured future delay. Disabling perceived queue delay
+disables both $Q_i$ and $B_i$.
+
+$P_i$ is the fraction of observed nearby agents whose intended local direction
+is within $45$ degrees of the candidate direction; stationary agents with
+a target can count. $N_i$ is the maximum of an opposing-motion fraction and
+a queue-cutting fraction. The latter counts earlier-priority waiters whom
+the candidate would place behind the deciding agent, using a clearance
+margin $a_i+a_j+0.05$ in target distance. It therefore includes stationary
+queues. The opposing-motion component considers speeds above $0.12$ and
+directional cosine below $-0.15$. These are operational norm definitions.
+
+The switching feature is
+\[
+ C_i(a,t)=\ind\{\text{a current target exists in this stage and }a\ne u_i\}.
+\]
+Beginning a new physical stage resets this commitment. Feature observations
+are frozen at tick start; the same feature-construction rules apply to all
+agents, independently of their utility weights.
+
+\subsection{Weights and decision rule}
+
+Each agent receives fixed weights in the order $(T,P,N,S)$:
+\begin{align}
+ \mathbf z_i&\sim\mathcal N_4(\boldsymbol\mu,\Sigma),\qquad
+ w_{ij}=e^{z_{ij}},\\
+ \Sigma&=\sigma^2[(1-\rho)I_4+\rho\mathbf1_4\mathbf1_4^{\mathsf T}],
+ \qquad\boldsymbol\mu=-\tfrac12\sigma^2\mathbf1_4.
+\end{align}
+Thus $\mathbb E[\mathbf w_i]=\mathbf1_4$, with strictly positive, unbounded,
+unnormalized components. Positive definiteness requires $-1/3<\rho<1$.
+Current values are $\sigma=1$ and $\rho=-0.15$.
+
+Behavioral utility is
+\[
+ U_i^{\rm beh}(a,t)=-w_{iT}T_i+w_{iP}P_i-w_{iN}N_i-w_{iS}C_i.
+\]
+The default full utility additionally retains the earlier distance and noise
+terms:
+\[
+ U_i(a,t)=\left(\frac{d_{i,\min}(t)+\ell_0}{d_i(a,t)+\ell_0}\right)^{\beta_i}
+       +U_i^{\rm beh}(a,t)
+       +\pi_i(1-e^{-t/60})\delta_{ia}(t)+\epsilon_{ia}(t),
+ \qquad \ell_0=1\text{ metre}.
+\]
+Here $\beta_i\in[0,1]$ is the bounded distance-sensitivity trait,
+$\pi_i\in[0,1]$ is panic sensitivity, and the two shock types use independent
+zero-mean normal draws of standard deviation $0.2$, held within 15-second
+bins. There is no standalone global crowd reward. The
+\code{behavioralOnly} option instead uses $U_i^{\rm beh}$ alone.
+
+After its reaction delay, an agent chooses
+\[
+ u_i(t)\in\operatorname*{arg\,max}_{a\in\mathcal A_i(t)} U_i(a,t),
+\]
+with first-enumerated action breaking exact ties. The current reconsideration
+interval is $\tau_{\rm dec}=3$ seconds in every decision region; physical stage
+changes and discovered target closures can cause earlier reconsideration.
+Consequently the nearest door need not maximize utility.
+
+\section{Geometry-dependent waypoints and social forces}
+
+\subsection{Local guidance}
+
+The selected action determines a waypoint $\mathbf g_i$, rather than permission
+to move along a straight line through walls. Row waypoints are row ends;
+aisle waypoints follow the selected aisle outward. Near a narrow orchestra
+opening, a sideways approach is aligned at $R_z^+-0.35$ before advancing.
+
+In an annulus, define
+\[
+ b_{ip}=\max(0.02,w_p/2-a_i-0.08),\qquad
+ \Delta\theta=\wrap(\phi_p-\theta_i).
+\]
+Direct approach requires $|\Delta\theta|<\pi/2$ and
+$|r_i\sin\Delta\theta|\leq b_{ip}$. Otherwise the safe circulation radius is
+\[
+ r_i^{\rm safe}=\clip(r_i,R^-+a_i+0.06,R^+-a_i-0.06).
+\]
+A radial correction is used when $|r_i-r_i^{\rm safe}|>0.05$; otherwise the
+waypoint advances angularly by $\clip(\Delta\theta,-0.065,0.065)$.
+This allows different circulation radii for opposing flows.
+
+An aligned exterior waypoint extends $0.6$ metres beyond its threshold.
+For a rectangular exit approached from the side, guidance first retreats
+inside the wall to depth $a_i+0.08$, if needed, and then aligns with the chosen
+opening. This permits a late target change from another doorway's apron.
+
+\subsection{Continuous acceleration proposal}
+
+Preferred speed $v_i^0$ is sampled using the configured normal speed model
+(mean $1.29$, standard deviation $0.19$, bounds $0.5$ and $2.3$).
+Reaction delays use the configured lognormal model with arithmetic mean $2$,
+standard deviation $1.2$, and bounds $0$ and $40$. These distribution bounds
+are clipping limits; the clipped sample need not retain the unbounded
+distribution's exact moments.
+Let $\widehat{\mathbf e}_i$ point from the current position to its waypoint.
+The manuscript-force proposal is
+\begin{align}
+ \frac{d\mathbf v_i}{dt}
+   &=\mathbf f_i^{\rm des}+\mathbf f_i^{\rm obs}+\mathbf f_i^{\rm int},\\
+ \mathbf f_i^{\rm des}
+   &=\frac{v_i^0\widehat{\mathbf e}_i-\mathbf v_i}{\tau_r},
+      \qquad\tau_r=0.65,\\
+ \mathbf f_i^{\rm obs}
+   &=\sum_{w\in W_i}A\exp(-d_{iw}/r_i^c)\widehat{\mathbf n}_{iw},
+      \qquad A=0.8,\quad r_i^c=0.15\text{ by default}.
+\end{align}
+At the exact waypoint, desired velocity is zero and relaxation brakes the
+agent. Individual comfort distances can override $r_i^c$. Obstacle distances
+are nonnegative centre-to-represented-surface distances. $W_i$ contains the
+schematic region or aisle boundary contacts and the orchestra barrier, rather
+than every real seat or wall. Open exterior apertures suppress the artificial
+wall contribution across their opening.
+
+For same-floor neighbors within $2.6$ metres, set
+\begin{align}
+ d_{ij}&=\|\mathbf x_j-\mathbf x_i\|,\qquad
+ \widehat{\mathbf x}_{ij}=(\mathbf x_j-\mathbf x_i)/d_{ij},\\
+ \mathbf D_{ij}&=\lambda(\mathbf v_i-\mathbf v_j)+\widehat{\mathbf x}_{ij},
+ \qquad\widehat{\mathbf D}_{ij}=\mathbf D_{ij}/\|\mathbf D_{ij}\|,\\
+ \widehat{\mathbf N}_{ij}&=(-\widehat D_{ij,y},\widehat D_{ij,x})^{\mathsf T},\\
+ \vartheta_{ij}&=\operatorname{atan2}
+   (\widehat{\mathbf D}_{ij}\mathbin{\times}\widehat{\mathbf x}_{ij},
+    \widehat{\mathbf D}_{ij}\cdot\widehat{\mathbf x}_{ij}).
+\end{align}
+The two-dimensional cross product here is scalar. Interpersonal acceleration is
+\[
+ \mathbf f_i^{\rm int}=-\sum_j e^{-d_{ij}/\|\mathbf D_{ij}\|}
+ \left[
+ e^{-(n'\vartheta_{ij}\|\mathbf D_{ij}\|)^2}\widehat{\mathbf D}_{ij}
+ +\operatorname{sgn}(\vartheta_{ij})
+  e^{-(n\vartheta_{ij}\|\mathbf D_{ij}\|)^2}\widehat{\mathbf N}_{ij}
+ \right],
+\]
+with $\lambda=0.25$ and $n=n'=1$. Coincident positions and vanishing
+$\mathbf D_{ij}$ are skipped at tolerance $10^{-12}$ to avoid undefined
+directions. These force calculations have no familiarity multiplier.
+
+\subsection{Discrete movement and local avoidance}
+
+For $\Delta t=0.1$, explicit Euler first gives
+\[
+ \widetilde{\mathbf v}_i^{k+1}
+ =\mathbf v_i^k+\Delta t\,
+       (\mathbf f_i^{\rm des}+\mathbf f_i^{\rm obs}+\mathbf f_i^{\rm int}).
+\]
+Its magnitude is capped by $1.35v_i^0$ and, for a nonzero waypoint distance,
+by $\|\mathbf g_i-\mathbf x_i\|/\Delta t$.
+
+Optional local avoidance checks predicted closest approach over $0.65$ seconds.
+It uses up to $0.04$ metres of extra padding, reduced at existing close contact.
+When the original request is unsafe or physical progress stalls, it considers
+zero velocity and nearby directions at full and half preferred speed. The
+angles are $0$, $\pm20$, $\pm40$, $\pm65$, $\pm90$, $\pm120$, and $180$ degrees.
+A deterministic passing-side preference resolves head-on symmetry. Candidate
+scores reward forward progress and passing, with a small penalty for departure
+from the force proposal. Progress of $0.12$ metres resets the stall clock;
+two seconds of insufficient progress activates the stalled condition.
+This stage does not change the selected target and bypasses seat-row motion.
+
+Let $\mathbf v_i^{\rm req}$ be the resulting request. Its displacement is
+\[
+ \Delta\mathbf x_i=\mathbf v_i^{\rm req}\Delta t,
+\]
+rescaled if necessary to have magnitude at most $0.7$ metres per tick.
+For a row agent, define $\mathbf e_\theta=(-\sin\theta_i,\cos\theta_i)^{\mathsf T}$;
+the candidate position is projected by
+\[
+ \theta_i^{\rm cand}=\clip\left(
+ \theta_i+\frac{\mathbf e_\theta\cdot\Delta\mathbf x_i}{R_i},
+ \theta_i^-,\theta_i^+\right),\qquad
+ \mathbf x_i^{\rm cand}=\mathbf p(R_i,\theta_i^{\rm cand}).
+\]
+Other agents first try the full displacement. If it fails, the engine tries,
+in order, half displacement, its $x$ component alone, and its $y$ component
+alone. A valid candidate is accepted; otherwise position is retained and
+realized velocity is set to zero. Accepted realized velocity is displacement
+divided by $\Delta t$. These constraints and fallbacks mean actual motion is
+not simply an unconstrained solution of the force differential equation.
+
+\section{Ordinary region changes and doorway service}
+
+Near a row end, within $0.07$ metres of row arc length, the policy requests an
+aisle landing at bearing
+\[
+ \alpha_i+s_i\frac{h-a_i-0.06}{R_i},\qquad s_i\in\{-1,+1\}.
+\]
+This landing must pass geometry and body-clearance checks. An aisle agent
+requests its outward continuation when $r_i\geq R_z^+-0.16$. Orchestra agents
+must use an ACCESS connector; loge and balcony agents change to their respective
+rims. Ordinary region changes cannot alter the floor or seating zone and are
+limited to the allowed row-to-aisle and aisle-to-rim transitions.
+
+For an interior portal $p$, admission requires eligibility, enablement,
+\[
+ \|\mathbf x_i-\mathbf p_p\|\leq0.65,
+\]
+and, for a radial portal, tangential clearance
+\[
+ |(-\sin\phi_p,\cos\phi_p)\cdot(\mathbf x_i-\mathbf p_p)|
+       \leq w_p/2-a_i-0.01.
+\]
+Door capacity additionally requires an available service token.
+
+Let $b_p$ be the token count. Initially and at each enabled tick,
+\begin{align}
+ b_p(0)&=\max(1,1.2w_p),\\
+ b_p^{\rm pre}&=\min\{\max(1,1.35w_p),\ b_p+1.3w_p\Delta t\}.
+\end{align}
+Each successful admission or exterior crossing consumes one token. These
+empirical width-dependent coefficients define the implemented service model;
+they are not measured or code-certified discharge rates. Disabled portals
+do not refill.
+
+An interior ordinary door performs a discrete transfer to a valid named
+destination entrance during the same tick. It does not integrate a continuous
+doorway passage. If every candidate landing is occupied, no transfer occurs
+and no token is consumed. Arrival updates the destination floor, region, zone,
+and position, preserves identity and weights, and sets planar velocity to zero.
+
+\section{Timed access and staircase connectors}
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+Connector & Total length & Flights & Lanes & Divider width\\
+\midrule
+Each ACCESS & 1.5 & $(1.5)$ & 1 & 0\\
+Each BACK stair & 15 & $(7.5,7.5)$ & 2 & 0.1\\
+Each STAGE stair & 12 & $(12)$ & 1 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For $m_p$ lanes and divider width $d_p^{\rm div}$, the lane width is
+\[
+ w_p^{\rm lane}=\frac{w_p-d_p^{\rm div}}{m_p}.
+\]
+Each BACK lane is therefore $0.75$ metres wide. Agent $i$ can enter only if
+$w_p^{\rm lane}>2a_i+0.02$. Connector speed, entry headway, and the lane
+occupancy bound used for admission are
+\begin{align}
+ v_{ip}^{\rm tr}&=\max(0.4,\eta_p v_i^0),\qquad
+ \eta_p=\begin{cases}0.7,&p\text{ is a stair},\\1,&p\text{ is ACCESS},\end{cases}\\
+ h_{ip}&=\max\!\left(0.35,\frac{2a_i+0.1}{v_{ip}^{\rm tr}}\right),\\
+ K_{ip}&=\max\!\left(1,\left\lfloor\frac{L_p}{2a_i+0.1}\right\rfloor\right).
+\end{align}
+A lane is eligible if its next-entry time has passed and its current occupancy
+is below $K_{ip}$. Among eligible lanes the model chooses minimum occupancy,
+then earliest next-entry time, then lowest lane index.
+
+For admission at $t_e$, nominal flight completion times are
+\[
+ t_{i,f}^{\rm nominal}=t_e+
+       \sum_{g=1}^{f}\frac{L_{p,g}}{v_{ip}^{\rm tr}}.
+\]
+The final scheduled arrival is
+\[
+ t_i^{\rm sched}=\max\left(t_{i,F}^{\rm nominal},
+                        t_{\rm previous}^{\rm sched}+h_{ip}\right).
+\]
+The lane's next-entry time becomes $t_e+h_{ip}$. Each lane is FIFO. An agent
+can arrive only after its scheduled time and when it is first in its lane.
+A blocked destination keeps it in transit, blocking later arrivals in that
+lane until a valid landing is available. Disabling a source portal prevents
+new admissions; it does not cancel agents already traveling in that connector.
+
+For destination centre $\mathbf e_p$, arrival normal $\mathbf n_p^{\rm in}$,
+and tangent $\mathbf t_p^{\rm in}=(-n_y^{\rm in},n_x^{\rm in})$, lane
+$\ell\in\{0,\ldots,m_p-1\}$ tries
+\[
+ \mathbf x^{\rm land}_{i,\ell,d}
+ =\mathbf e_p+\left(\ell-\frac{m_p-1}{2}\right)w_p^{\rm lane}\mathbf t_p^{\rm in}
+                +d\mathbf n_p^{\rm in},\qquad
+ d\in\{0,0.25,0.5,0.75\}.
+\]
+The first geometrically valid and unoccupied landing is selected. Ordinary
+doors use the same landing construction with one lane and no lateral offset.
+
+During timed transit, the agent is removed from both planar body indexes.
+Its identity and preferences persist, but no continuous stair position,
+stair-body contact force, or interaction between separate lanes is computed.
+Leaving the balcony is therefore a change of plane, not completion.
+
+\section{Exterior thresholds and exact completion}
+
+For an exterior portal $p$, let $\mathbf p_p$ be its centre,
+$\mathbf n_p$ its outward unit normal, and
+$\mathbf t_p=(-n_{p,y},n_{p,x})^{\mathsf T}$. The geometric doorway segment is
+\[
+ \Gamma_p=\{\mathbf p_p+s\mathbf t_p:|s|\leq w_p/2\}.
+\]
+Normals are radial outward for side doors, $(0,1)^{\mathsf T}$ for M doors,
+and $(\pm1,0)^{\mathsf T}$ for the corresponding ground stage thresholds.
+
+For old and proposed centres $\mathbf x^0,\mathbf x^1$, set
+\[
+ s_0=\mathbf n_p\cdot(\mathbf x^0-\mathbf p_p),\qquad
+ s_1=\mathbf n_p\cdot(\mathbf x^1-\mathbf p_p).
+\]
+An outward crossing requires $s_0<0\leq s_1$, with the implementation also
+handling a start on the threshold using a $10^{-9}$ numerical tolerance.
+The crossing fraction and point are
+\[
+ \lambda_* = \clip\left(\frac{-s_0}{s_1-s_0},0,1\right),\qquad
+ \mathbf x_*=\mathbf x^0+\lambda_*(\mathbf x^1-\mathbf x^0).
+\]
+Body fit additionally requires
+\[
+ |\mathbf t_p\cdot(\mathbf x_*-\mathbf p_p)|\leq w_p/2-a_i-0.01.
+\]
+The portal must be eligible, enabled, have a token when capacity is enforced,
+and be on floor $0$. A short exit apron permits body centres near and beyond
+the threshold:
+\[
+ -a_i-0.05\leq\mathbf n_p\cdot(\mathbf x-\mathbf p_p)\leq0.8,
+ \qquad |\mathbf t_p\cdot(\mathbf x-\mathbf p_p)|\leq w_p/2-a_i-0.01.
+\]
+An exterior candidate beyond the nominal boundary must contain a valid swept
+threshold crossing; an endpoint in an apron does not authorize a diagonal
+shortcut through the adjacent wall.
+
+For a step from $t_k$ to $t_{k+1}=t_k+\Delta t$, the recorded exit time is
+\[
+ \tau_i=t_k+\lambda_*\Delta t.
+\]
+The centre is frozen at $\mathbf x_*$, the velocity is set to zero, and the
+agent becomes inactive on the outside state. Proximity alone never counts as
+completion. If several thresholds intersect a step, the earliest crossing is
+used. Outdoor monumental and portico stairs lie after this completion event
+and do not contribute additional modeled evacuation time. The ADA elevator
+is permanently excluded from evacuation eligibility.
+
+\section{Update order, conservation, and model limits}
+
+Each tick advances the clock, replenishes enabled portal tokens, freezes
+behavioral observations, and processes agents in a seeded random order.
+An active planar agent observes and decides when due, requests motion,
+undergoes geometric acceptance, and may request a region or portal transition.
+Transit agents instead advance their lane and arrival state. Later physical
+updates see earlier accepted positions in the same tick, even though behavioral
+features use the frozen observation snapshot.
+
+For all times,
+\[
+ N_0(t)+N_1(t)+N_{\rm transit}(t)+N_{\rm exited}(t)=n.
+\]
+Transfers preserve agents rather than creating replacement agents. The run
+stops at full clearance or the configured time limit, currently 1800 seconds.
+The reported clearance time is
+\[
+ T_{\rm clear}=\max_i\tau_i
+\]
+only if every agent exits; otherwise it is undefined and exported as null.
+
+The main limitations are schematic metric geometry; state-dependent and
+nonuniform wall clearance; endpoint-based ordinary collision checks; discrete
+door transfers; timed rather than spatial stair motion; approximate sight and
+norm features; and uncalibrated force, queue, and service parameters. The
+model does not guarantee that every heterogeneous crowded realization clears.
+No exact as-built reconstruction or evacuation certification is implied.
+
+\section{Implementation correspondence}
+
+\begin{longtable}{p{0.33\linewidth}p{0.60\linewidth}}
+\toprule
+Source & Mathematical responsibility\\
+\midrule
+\endhead
+\code{default_world.json} & Dimensions, seat inventory, regions, portal records, named entrances, and world limits.\\
+\code{geometry.py} & Polar transforms, largest-remainder seat construction, geometry dispatch.\\
+\code{plans.py} & Region/barrier/apron predicates, portal eligibility, exterior intersections, local waypoints, obstacle contacts.\\
+\code{engine.py} & Population allocation, collision checks, discrete motion, token refill, region changes, and completion.\\
+\code{transfers.py} & Interior doorway landings, connector admission, lane scheduling, FIFO arrival, and threshold finalization.\\
+\code{perception.py} & Sight range and angle, schematic wall/aperture occlusion, optional visibility segments.\\
+\code{arrival.py} & Recorded or reconstructed admission-route knowledge.\\
+\code{behavior.py} & Perceived local actions, frozen observations, four behavioral features, choice, and reconsideration.\\
+\code{social_force.py}, \code{navigation.py} & Force proposal and optional collision-aware local steering.\\
+\code{default_policy_settings.json} & Numerical behavioral, sensing, force, and steering coefficients.\\
+\code{plan_viewer.py}, \code{viewer.py} & Read-only visualization; drawing primitives do not define collision acceptance.\\
+\bottomrule
+\end{longtable}
+
+\end{document}

@@ -1,0 +1,15 @@
+{
+  "participants": 150,
+  "seed": 42,
+  "maxSteps": 5000,
+  "weightMean": 0.5,
+  "weightVariance": 1,
+  "geometry": {
+    "type": "square",
+    "size": 31,
+    "exitWidth": 1,
+    "obstacles": [
+      { "x": 13, "y": 8, "width": 3, "height": 15 }
+    ]
+  }
+}

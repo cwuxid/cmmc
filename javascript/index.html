@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auditorium movement laboratory</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><div class="eyebrow">AGENT-BASED SIMULATION · ABSTRACT SPACE</div>
+    <h1>Auditorium movement laboratory</h1>
+    <p>Individual preferences. Shared space. Four ways out.</p></header>
+  <main>
+    <aside>
+      <h2>Experiment</h2>
+      <div class="fields">
+        <label>Participants<input id="participants" type="number" min="0" step="1" value="150"></label>
+        <label>Square side (cells)<input id="size" type="number" min="7" step="1" value="31"></label>
+        <label>Exit width (cells)<input id="exitWidth" type="number" min="1" step="1" value="1"></label>
+        <label>Random seed<input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></label>
+      </div>
+      <p class="note">Every agent’s five behavioral weights are independent draws from N(0.5, 1): mean 0.5, variance 1, standard deviation 1. Negative draws are retained.</p>
+      <div class="buttons"><button id="reset">Create / reset</button><button id="toggle" class="primary">Run</button><button id="step">One step</button></div>
+      <label>Playback speed<select id="speed"><option value="1">1 step / frame</option><option value="5" selected>5 steps / frame</option><option value="25">25 steps / frame</option><option value="100">100 steps / frame</option></select></label>
+      <p id="status" role="status" aria-live="polite"></p>
+      <details><summary>Geometry & model configuration</summary>
+        <p class="note">Edit JSON to add obstacle rectangles, explicit exits, or model settings. Applying it replaces the current run. See README.md for units and assumptions.</p>
+        <textarea id="configuration" rows="16" spellcheck="false" aria-label="Simulation configuration JSON"></textarea>
+        <button id="apply">Apply JSON</button>
+      </details>
+      <div class="buttons"><button id="json">Export full run</button><button id="csv">Agents CSV</button><button id="configDownload">Export config</button></div>
+      <h2>Inspect a participant</h2>
+      <p class="note">Click a person in the room. Colors show current exit targets; gray means no decision yet.</p>
+      <pre id="inspector">No participant selected.</pre>
+    </aside>
+    <section class="workspace" aria-label="Simulation results">
+      <div class="metrics">
+        <div><span>TIME STEP</span><strong id="time">0</strong></div>
+        <div><span>EXITED</span><strong id="exited">0 / 150</strong></div>
+        <div><span>MEAN WAIT</span><strong id="waiting">0</strong></div>
+        <div><span>CONFLICTS</span><strong id="conflicts">0</strong></div>
+      </div>
+      <div class="room"><canvas id="room" width="850" height="850" aria-label="Square room with moving agents and four boundary exits"></canvas></div>
+      <div id="legend" class="legend"></div>
+      <div class="chart"><h2>Cumulative exits</h2><canvas id="chart" width="850" height="180" aria-label="Cumulative exited participants against time steps"></canvas></div>
+      <p class="note">One cell per person. At most one move per step. Disputed cells are resolved randomly; nobody wins by having a higher utility. Time and distance use abstract units.</p>
+    </section>
+  </main>
+  <script src="model.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
